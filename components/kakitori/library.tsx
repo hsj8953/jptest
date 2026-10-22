@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, Clock3, FilePenLine, Music2, Plus, Trash2, UserPlus } from 'lucide-react'
+import { ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Trash2, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrect, useStore } from '@/lib/store'
 import type { Song } from '@/lib/types'
@@ -63,7 +63,37 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
           const pct = n ? Math.round((ok / n) * 100) : 0
           const timed = isTimed(song)
           return (
-            <article key={song.id} className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+            <article key={song.id} className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+              <button
+                type="button"
+                onClick={() => (timed || isAdmin) && onSelect(song.id)}
+                disabled={!timed && !isAdmin}
+                aria-label={`${song.title} 공부하기`}
+                className="relative mb-4 block aspect-video w-full overflow-hidden rounded-xl bg-muted disabled:cursor-default"
+              >
+                {song.youtubeId ? (
+                  <img
+                    src={`https://i.ytimg.com/vi/${song.youtubeId}/hqdefault.jpg`}
+                    alt=""
+                    loading="lazy"
+                    className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                  />
+                ) : (
+                  <span className="grid size-full place-items-center bg-gradient-to-br from-secondary to-muted text-muted-foreground">
+                    <Music2 className="size-8" />
+                  </span>
+                )}
+                {(timed || isAdmin) && (
+                  <span className="absolute inset-0 grid place-items-center bg-black/0 transition group-hover:bg-black/30">
+                    <span className="grid size-12 scale-90 place-items-center rounded-full bg-white/90 text-slate-900 opacity-0 shadow-lg transition group-hover:scale-100 group-hover:opacity-100">
+                      <Play className="ml-0.5 size-5 fill-current" />
+                    </span>
+                  </span>
+                )}
+                {n > 0 && ok === n && (
+                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow">완주</span>
+                )}
+              </button>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -75,9 +105,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
                   <h2 className="font-jp text-xl font-bold break-words">{song.title}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{song.artist}</p>
                 </div>
-                <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><Music2 className="size-5" /></div>
               </div>
-              <div className="mt-6">
+              <div className="mt-auto pt-6">
                 <div className="mb-2 flex justify-between text-xs">
                   <span className="text-muted-foreground">내 정답 <b className="text-foreground">{ok} / {n}</b></span>
                   <span className="font-semibold text-primary">{pct}%</span>
