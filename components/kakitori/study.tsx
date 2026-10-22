@@ -174,7 +174,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
 
           <div className="mt-5 rounded-2xl border border-border bg-card p-4 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
-              <label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기</label>
+              <label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기 <span className="font-normal text-destructive">*</span></label>
               {result && !result.revealed && <span className={result.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{result.ok ? '〇 정답' : '✕ 오답'}</span>}
             </div>
             <textarea
@@ -225,9 +225,14 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
                 )}
                 <p className="mt-4 text-xs font-semibold text-muted-foreground">정답</p>
                 <p className="mt-1 font-jp text-xl leading-loose"><Furigana text={sentence.ruby} /></p>
-                <p className="mt-3 text-xs font-semibold text-muted-foreground">해석</p>
-                <p className="mt-1">{sentence.ko || <span className="text-muted-foreground">해석 없음</span>}</p>
-                {translation.trim() && <p className="mt-2 text-xs text-muted-foreground">내 해석: {translation.trim()}</p>}
+                <p className="mt-4 text-sm font-semibold text-muted-foreground">원래 해석</p>
+                <p className="mt-1 text-base leading-7">{sentence.ko || <span className="text-muted-foreground">해석 없음</span>}</p>
+                {translation.trim() && (
+                  <>
+                    <p className="mt-3 text-sm font-semibold text-muted-foreground">내 해석</p>
+                    <p className="mt-1 text-base leading-7">{translation.trim()}</p>
+                  </>
+                )}
               </div>
             )}
 
