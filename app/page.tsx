@@ -15,6 +15,21 @@ import type { User } from '@/lib/types'
 
 type View = 'library' | 'study' | 'editor' | 'timing' | 'invite'
 type AuthState = 'loading' | 'out' | 'not-invited' | 'in'
+type Route = { view: View; id: string | null }
+
+// 화면 위치를 주소(?v=study&song=곡ID)에 기록해서 새로고침 · 뒤로가기 · 링크 공유가 되게 해요
+const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite']
+function readRoute(): Route {
+  const p = new URLSearchParams(window.location.search)
+  const v = p.get('v') as View | null
+  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song') }
+}
+function routeUrl(r: Route) {
+  if (r.view === 'library') return window.location.pathname
+  const p = new URLSearchParams({ v: r.view })
+  if (r.id) p.set('song', r.id)
+  return `${window.location.pathname}?${p.toString()}`
+}
 
 function useDarkMode() {
   const [dark, setDark] = useState(false)
@@ -50,10 +65,34 @@ export default function Page() {
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const [loginError, setLoginError] = useState('')
-  const { songs } = useStore()
+  const { songs, ready } = useStore()
   const [view, setView] = useState<View>('library')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { dark, toggle } = useDarkMode()
+
+  useEffect(() => {
+    const apply = () => {
+      const r = readRoute()
+      setView(r.view)
+      setSelectedId(r.id)
+    }
+    apply()
+    const onPop = () => {
+      apply()
+      window.scrollTo(0, 0)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  // 주소에 있는 곡이 삭제됐으면 목록으로
+  useEffect(() => {
+    if (ready && selectedId && !songs.some((s) => s.id === selectedId)) {
+      window.history.replaceState(null, '', routeUrl({ view: 'library', id: null }))
+      setView('library')
+      setSelectedId(null)
+    }
+  }, [ready, songs, selectedId])
 
   useEffect(() => {
     if (!firebaseConfigured) return
@@ -85,8 +124,6 @@ export default function Page() {
       const me: User = { uid: u.uid, name: u.displayName || em.split('@')[0] || '친구', email: em, isAdmin }
       setUser(me)
       startSync(me)
-      setView('library')
-      setSelectedId(null)
       setAuth('in')
     })
   }, [])
@@ -106,6 +143,9 @@ export default function Page() {
     }
   }
   const logout = () => {
+    window.history.replaceState(null, '', routeUrl({ view: 'library', id: null }))
+    setView('library')
+    setSelectedId(null)
     stopSync()
     signOut(getFirebaseAuth())
   }
@@ -121,6 +161,8 @@ export default function Page() {
   const isAdmin = user.isAdmin
   const selected = songs.find((s) => s.id === selectedId)
   const go = (v: View, id: string | null = selectedId) => {
+    const url = routeUrl({ view: v, id })
+    if (url !== window.location.pathname + window.location.search) window.history.pushState(null, '', url)
     setSelectedId(id)
     setView(v)
     window.scrollTo(0, 0)
@@ -138,7 +180,9 @@ export default function Page() {
   )
 
   let body = library
-  if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
+  const needsSong = view === 'study' || view === 'timing' || (view === 'editor' && !!selectedId)
+  if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
+  else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
   else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? 'new'} song={selected} onBack={goLibrary} onSaved={(id) => go('timing', id)} />
   else if (view === 'timing' && isAdmin && selected) body = <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
   else if (view === 'study' && selected) body = <Study key={selected.id} song={selected} user={user} onBack={goLibrary} />
