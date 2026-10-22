@@ -59,15 +59,22 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
     }
   }
 
-  const save = () => {
+  const save = async () => {
     const youtubeId = yt.trim() ? parseYouTubeId(yt) : null
     const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: l.ruby.trim(), ko: l.ko.trim(), start: l.start ?? null }))
     if (!title.trim()) return setError('곡 제목을 적어 주세요.')
     if (ytInvalid) return setError('유튜브 링크 형식을 확인해 주세요.')
     if (!lines.length) return setError('가사를 붙여넣고 ‘문장 나누기’를 눌러 주세요.')
     const id = song?.id ?? newSongId()
-    actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, createdAt: song?.createdAt ?? Date.now() })
-    onSaved(id)
+    setBusy(true)
+    setError('')
+    try {
+      await actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, createdAt: song?.createdAt ?? Date.now() })
+      onSaved(id)
+    } catch {
+      setError('저장하지 못했어요. 관리자 계정인지, 인터넷이 연결돼 있는지 확인해 주세요.')
+      setBusy(false)
+    }
   }
 
   const rowJp = rows?.filter((l) => l.ruby.trim()).length ?? 0

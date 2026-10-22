@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// 카키토리 노트 보안 규칙
+// 1) 아래 ADMIN_EMAIL_HERE 를 관리자 구글 이메일로 바꾸세요. (.env.local 의 NEXT_PUBLIC_ADMIN_EMAIL 과 같게)
+// 2) Firebase 콘솔 > Firestore > 규칙 탭에 이 파일 내용을 통째로 붙여넣고 [게시]를 누르세요.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function email() { return request.auth.token.email.lower(); }
+    function isAdmin() { return signedIn() && email() == "ADMIN_EMAIL_HERE".lower(); }
+    function invited() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/config/access)
+        && email() in get(/databases/$(database)/documents/config/access).data.emails;
+    }
+    function member() { return isAdmin() || invited(); }
+
+    // 초대 목록: 로그인한 사람은 자기가 초대됐는지 확인만, 수정은 관리자만
+    match /config/access {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // 곡: 멤버는 읽기, 관리자만 쓰기
+    match /songs/{songId} {
+      allow read: if member();
+      allow write: if isAdmin();
+
+      // 친구들 점수: 멤버는 모두 보고, 자기 것만 씀 (관리자는 곡 삭제 때 정리)
+      match /scores/{uid} {
+        allow read: if member();
+        allow write: if member() && request.auth.uid == uid;
+        allow delete: if isAdmin();
+      }
+    }
+
+    // 내 진도 · 내가 쓴 답: 본인만
+    match /users/{uid}/{document=**} {
+      allow read, write: if member() && request.auth.uid == uid;
+    }
+  }
+}

@@ -17,7 +17,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
   onInvite: () => void
   onNew: () => void
 }) {
-  const { songs, progress } = useStore()
+  const { songs, progress, ready, error } = useStore()
+  const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
   const solved = songs.reduce((n, s) => n + countCorrect(progress[s.id], s.lines.length), 0)
@@ -45,7 +46,11 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
         <Stat label="다 맞힌 곡" value={finished} />
       </div>
 
-      {sorted.length === 0 && (
+      {error && <p className="mb-4 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
+      {delError && <p className="mb-4 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{delError}</p>}
+      {!ready && <p className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">곡 목록을 불러오는 중…</p>}
+
+      {ready && sorted.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
           {isAdmin ? '아직 등록한 곡이 없어요. ‘새 곡 등록’에서 유튜브 링크와 가사를 넣어 주세요.' : '아직 등록된 곡이 없어요. 관리자가 곡을 올리면 여기에 나타나요.'}
         </div>
@@ -100,7 +105,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
                   <span>이 곡과 기록을 모두 지울까요?</span>
                   <span className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => setConfirmDel(null)}>취소</Button>
-                    <Button size="sm" variant="destructive" onClick={() => { setConfirmDel(null); actions.deleteSong(song.id) }}>삭제</Button>
+                    <Button size="sm" variant="destructive" onClick={() => { setConfirmDel(null); actions.deleteSong(song.id).catch(() => setDelError('삭제하지 못했어요. 관리자 계정인지 확인해 주세요.')) }}>삭제</Button>
                   </span>
                 </div>
               )}

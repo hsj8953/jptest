@@ -52,10 +52,16 @@ export function Timing({ song, onBack, onStudy, onEdit }: { song: Song; onBack: 
     yt.seek(0)
     setMsg('')
   }
-  const save = () => {
-    actions.saveSong({ ...song, lines })
-    const missing = lines.filter((l) => l.start == null).length
-    setMsg(missing ? `저장했어요. 시작점이 없는 문장 ${missing}개는 친구들이 들을 수 없어요.` : '저장했어요.')
+  const save = async () => {
+    try {
+      await actions.saveSong({ ...song, lines })
+      const missing = lines.filter((l) => l.start == null).length
+      setMsg(missing ? `저장했어요. 시작점이 없는 문장 ${missing}개는 친구들이 들을 수 없어요.` : '저장했어요.')
+      return true
+    } catch {
+      setMsg('저장하지 못했어요. 다시 시도해 주세요.')
+      return false
+    }
   }
 
   return (
@@ -117,7 +123,7 @@ export function Timing({ song, onBack, onStudy, onEdit }: { song: Song; onBack: 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
         {msg && <p className="mr-auto text-sm text-muted-foreground">{msg}</p>}
         <Button variant="outline" onClick={save}>타이밍 저장</Button>
-        <Button onClick={() => { save(); yt.stop(); onStudy(song.id) }}>저장하고 직접 풀어보기<ChevronRight data-icon="inline-end" /></Button>
+        <Button onClick={async () => { if (await save()) { yt.stop(); onStudy(song.id) } }}>저장하고 직접 풀어보기<ChevronRight data-icon="inline-end" /></Button>
       </div>
     </main>
   )

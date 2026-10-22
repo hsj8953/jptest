@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Trophy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { actions, countCorrect, useStore } from '@/lib/store'
+import { actions, countCorrect, useStore, watchScores, type Score } from '@/lib/store'
 import { baseText } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
@@ -28,11 +28,15 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const [repeat, setRepeat] = useState(false)
   const [speed, setSpeed] = useState('1')
   const [showResults, setShowResults] = useState(false)
+  const [scores, setScores] = useState<Score[]>([])
+  const [saveError, setSaveError] = useState('')
   const drafts = useRef<Record<number, { answer: string; translation: string }>>({})
   const answerRef = useRef<HTMLTextAreaElement>(null)
   const koRef = useRef<HTMLInputElement>(null)
   const [needKo, setNeedKo] = useState(false)
   const yt = useYouTube(song.youtubeId)
+
+  useEffect(() => watchScores(song.id, setScores), [song.id])
 
   useEffect(() => {
     if (yt.ready) yt.setRate(Number(speed))
@@ -73,7 +77,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
           window.scrollTo(0, 0)
         }}
         onRestart={() => {
-          actions.saveProgress(song.id, {})
+          actions.saveProgress(song.id, {}).catch(() => {})
           drafts.current = {}
           setAnswer('')
           setTranslation('')
@@ -91,7 +95,10 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const endOf = (k: number) => L.slice(k + 1).find((l) => l.start != null)?.start ?? yt.duration ?? (L[k].start ?? 0) + 8
   const canPlay = !!song.youtubeId && yt.ready && sentence.start != null
 
-  const save = (next: typeof prog) => actions.saveProgress(song.id, next)
+  const save = (next: typeof prog) => {
+    setSaveError('')
+    actions.saveProgress(song.id, next).catch(() => setSaveError('기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
+  }
 
   const move = (k: number) => {
     if (k < 0 || k >= total) return
@@ -213,6 +220,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
             />
             {needKo && !result && <p className="mt-2 text-xs text-destructive">한국어 해석까지 적어야 채점할 수 있어요.</p>}
 
+            {saveError && <p className="mt-3 text-xs text-destructive">{saveError}</p>}
             {result && (
               <div className="mt-5 rounded-xl bg-muted/60 p-4 text-sm">
                 {!result.revealed ? (
@@ -294,14 +302,25 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
               <h2 className="text-sm font-semibold">친구들 기록</h2>
               <Users className="size-4 text-muted-foreground" />
             </div>
-            <div>
-              <div className="mb-1 flex justify-between text-xs">
-                <span>{user.name}<span className="ml-1 text-primary">(나)</span></span>
-                <span className="text-muted-foreground tabular-nums">{okCount} / {total}</span>
-              </div>
-              <ProgressBar value={(okCount / total) * 100} />
-            </div>
-            <p className="mt-4 text-xs leading-5 text-muted-foreground">친구들 기록은 로그인 기능을 연결하면 여기에 함께 보여요.</p>
+            {(() => {
+              // 내 기록은 항상 최신 값으로, 친구들은 정답 많은 순
+              const others = scores.filter((sc) => sc.uid !== user.uid)
+              const list = [{ uid: user.uid, name: user.name, ok: okCount, total }, ...others].sort((a, b) => b.ok - a.ok)
+              return (
+                <div className="flex flex-col gap-4">
+                  {list.map((sc) => (
+                    <div key={sc.uid}>
+                      <div className="mb-1 flex justify-between gap-2 text-xs">
+                        <span className="min-w-0 truncate">{sc.name}{sc.uid === user.uid && <span className="ml-1 text-primary">(나)</span>}</span>
+                        <span className="shrink-0 text-muted-foreground tabular-nums">{sc.ok} / {sc.total || total}</span>
+                      </div>
+                      <ProgressBar value={((sc.ok) / (sc.total || total)) * 100} />
+                    </div>
+                  ))}
+                  {others.length === 0 && <p className="text-xs leading-5 text-muted-foreground">아직 이 곡을 푼 친구가 없어요.</p>}
+                </div>
+              )
+            })()}
           </div>
         </aside>
       </div>

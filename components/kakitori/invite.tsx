@@ -20,8 +20,8 @@ export function Invite({ onBack }: { onBack: () => void }) {
     if (!EMAIL.test(value)) return setMsg('올바른 이메일 형식이 아니에요.')
     if (invites.includes(value)) return setMsg('이미 초대한 이메일이에요.')
     actions.setInvites([...invites, value])
-    setEmail('')
-    setMsg(`${value} 을(를) 초대했어요.`)
+      .then(() => { setEmail(''); setMsg(`${value} 을(를) 초대했어요.`) })
+      .catch(() => setMsg('저장하지 못했어요. 다시 시도해 주세요.'))
   }
 
   return (
@@ -43,7 +43,7 @@ export function Invite({ onBack }: { onBack: () => void }) {
           {invites.map((item) => (
             <div key={item} className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-3 py-3 text-sm">
               <span className="min-w-0 truncate">{item}</span>
-              <button type="button" onClick={() => actions.setInvites(invites.filter((i) => i !== item))} className="shrink-0 text-muted-foreground hover:text-destructive">빼기</button>
+              <button type="button" onClick={() => actions.setInvites(invites.filter((i) => i !== item)).catch(() => setMsg('저장하지 못했어요. 다시 시도해 주세요.'))} className="shrink-0 text-muted-foreground hover:text-destructive">빼기</button>
             </div>
           ))}
         </div>
