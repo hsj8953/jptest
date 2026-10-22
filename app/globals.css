@@ -160,7 +160,6 @@
 .stamp-ok { color: oklch(0.45 0.15 150); background: oklch(0.92 0.06 150); }
 .stamp-no { color: oklch(0.5 0.18 25); background: oklch(0.93 0.05 25); }
 
-.study-page aside { display: none; }
 
 @layer base {
   * {

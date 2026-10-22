@@ -7,10 +7,16 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
-.env*.local
+# Environment variables (Firebase 키 등)
+.env*
+!.env.example
 
 # Common ignores
 node_modules
 .next/
 .DS_Store
+
+# 후리가나 사전 (npm install 때 자동 복사)
+public/kuromoji/
+
+*.tsbuildinfo

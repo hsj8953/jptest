@@ -1,101 +1,87 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import {
-  ArrowLeft,
-  BookOpen,
-  Check,
-  ChevronRight,
-  Clock3,
-  Copy,
-  FilePenLine,
-  Gauge,
-  Headphones,
-  Link2,
-  LogOut,
-  Menu,
-  Moon,
-  Music2,
-  Pause,
-  Play,
-  Plus,
-  RotateCcw,
-  Send,
-  Settings2,
-  Sun,
-  Trash2,
-  UserPlus,
-  Users,
-  X,
-  Youtube,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useEffect, useState } from 'react'
+import { Header } from '@/components/kakitori/header'
+import { Library } from '@/components/kakitori/library'
+import { Study } from '@/components/kakitori/study'
+import { Editor } from '@/components/kakitori/editor'
+import { Timing } from '@/components/kakitori/timing'
+import { Invite } from '@/components/kakitori/invite'
+import { Login } from '@/components/kakitori/login'
+import { MOCK_USER, useStore } from '@/lib/store'
 
-type Sentence = { jp: string; ko: string; furigana?: string; start: number }
-type Song = { id: number; title: string; artist: string; sentences: Sentence[]; timed: boolean; progress: number }
+type View = 'login' | 'library' | 'study' | 'editor' | 'timing' | 'invite'
 
-const seedSongs: Song[] = [
-  {
-    id: 1,
-    title: '星降る帰り道',
-    artist: '月島リリ',
-    timed: true,
-    progress: 42,
-    sentences: [
-      { jp: '夜空に小さな光が咲いた', ko: '밤하늘에 작은 빛이 피어났어', furigana: '夜空{よぞら}に小さな光{ひかり}が咲{さ}いた', start: 0 },
-      { jp: '君と歩く帰り道は特別だね', ko: '너와 걷는 귀갓길은 특별하네', furigana: '君{きみ}と歩{ある}く帰{かえ}り道{みち}は特別{とくべつ}だね', start: 8.4 },
-      { jp: '遠くで電車の音が聞こえる', ko: '멀리서 전철 소리가 들려와', furigana: '遠{とお}くで電車{でんしゃ}の音{おと}が聞{き}こえる', start: 16.8 },
-      { jp: '明日も同じ笑顔で会おう', ko: '내일도 같은 웃음으로 만나자', furigana: '明日{あした}も同{おな}じ笑顔{えがお}で会{あ}おう', start: 25.1 },
-    ],
-  },
-  {
-    id: 2,
-    title: '雨上がりのメロディ',
-    artist: '青いソーダ',
-    timed: true,
-    progress: 67,
-    sentences: [
-      { jp: '雨上がりの街は少し透明', ko: '비가 갠 거리는 조금 투명해', furigana: '雨上{あめあ}がりの街{まち}は少{すこ}し透明{とうめい}', start: 0 },
-      { jp: '濡れた靴でリズムを刻む', ko: '젖은 신발로 리듬을 새겨', furigana: '濡{ぬ}れた靴{くつ}で刻{きざ}む', start: 7.2 },
-      { jp: '虹の向こうへ行ってみよう', ko: '무지개 너머로 가 보자', furigana: '虹{にじ}の向{む}こうへ行{い}ってみよう', start: 14.9 },
-    ],
-  },
-  { id: 3, title: 'まだ見ぬ朝', artist: '春野カナ', timed: false, progress: 0, sentences: [{ jp: 'まだ見ぬ朝を迎えに行こう', ko: '아직 보지 못한 아침을 맞으러 가자', furigana: '見{み}ぬ朝{あさ}を迎{むか}えに行{い}こう', start: 0 }] },
-]
-
-function Furigana({ text }: { text: string }) {
-  const parts = text.split(/([一-龯々]+\{[^}]+\})/g).filter(Boolean)
-  return <span>{parts.map((part, i) => { const match = part.match(/^(.+)\{(.+)\}$/); return match ? <ruby key={i}>{match[1]}<rt>{match[2]}</rt></ruby> : <span key={i}>{part}</span> })}</span>
+function useDarkMode() {
+  const [dark, setDark] = useState(false)
+  useEffect(() => {
+    let initial = window.matchMedia('(prefers-color-scheme: dark)').matches
+    try {
+      const saved = window.localStorage.getItem('kakitori.theme')
+      if (saved) initial = saved === 'dark'
+    } catch {
+      /* 무시 */
+    }
+    setDark(initial)
+  }, [])
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+  }, [dark])
+  const toggle = () => {
+    setDark((d) => {
+      try {
+        window.localStorage.setItem('kakitori.theme', d ? 'light' : 'dark')
+      } catch {
+        /* 무시 */
+      }
+      return !d
+    })
+  }
+  return { dark, toggle }
 }
 
-function Header({ isAdmin, onHome, onDark }: { isAdmin: boolean; onHome: () => void; onDark: () => void }) {
-  return <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur-md"><div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6"><button onClick={onHome} className="flex items-center gap-2 text-left"><span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><BookOpen className="size-5" /></span><span><span className="block text-sm font-bold tracking-tight">카키토리 노트</span><span className="font-jp text-[11px] text-muted-foreground">書き取りノート</span></span></button><div className="flex items-center gap-2"><button onClick={onDark} className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-muted" aria-label="다크 모드 전환"><Moon className="size-4" /></button><div className="hidden items-center gap-2 border-l border-border pl-3 sm:flex"><span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">유</span><span className="text-sm">유나 <span className="text-xs text-primary">관리자</span></span><button className="ml-1 text-muted-foreground" aria-label="로그아웃"><LogOut className="size-4" /></button></div><button className="grid size-9 place-items-center rounded-full hover:bg-muted sm:hidden" aria-label="메뉴"><Menu className="size-5" /></button></div></div></header>
+export default function Page() {
+  // Firebase 로그인을 붙이면 user 와 관리자 여부가 여기로 들어와요.
+  const user = MOCK_USER
+  const isAdmin = user.isAdmin
+  const { songs } = useStore()
+  const [view, setView] = useState<View>('login')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { dark, toggle } = useDarkMode()
+  const selected = songs.find((s) => s.id === selectedId)
+
+  const go = (v: View, id: string | null = selectedId) => {
+    setSelectedId(id)
+    setView(v)
+    window.scrollTo(0, 0)
+  }
+  const goLibrary = () => go('library', null)
+
+  // 고르던 곡이 삭제됐거나 없으면 목록으로
+  const needsSong = view === 'study' || view === 'timing'
+  const body =
+    view === 'login' ? <Login onLogin={goLibrary} />
+    : view === 'invite' && isAdmin ? <Invite onBack={goLibrary} />
+    : view === 'editor' && isAdmin ? <Editor key={selectedId ?? 'new'} song={selected} onBack={goLibrary} onSaved={(id) => go('timing', id)} />
+    : view === 'timing' && isAdmin && selected ? <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
+    : view === 'study' && selected ? <Study key={selected.id} song={selected} user={user} onBack={goLibrary} />
+    : (
+      <Library
+        isAdmin={isAdmin}
+        onSelect={(id) => go('study', id)}
+        onEdit={(id) => go('editor', id)}
+        onTiming={(id) => go('timing', id)}
+        onInvite={() => go('invite', null)}
+        onNew={() => go('editor', null)}
+      />
+    )
+
+  return (
+    <div className="min-h-screen bg-background">
+      {view !== 'login' && <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={() => go('login', null)} />}
+      {needsSong && !selected ? (
+        <Library isAdmin={isAdmin} onSelect={(id) => go('study', id)} onEdit={(id) => go('editor', id)} onTiming={(id) => go('timing', id)} onInvite={() => go('invite', null)} onNew={() => go('editor', null)} />
+      ) : body}
+    </div>
+  )
 }
-
-function ProgressBar({ value }: { value: number }) { return <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${value}%` }} /></div> }
-
-function Library({ songs, isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onDelete }: { songs: Song[]; isAdmin: boolean; onSelect: (s: Song) => void; onEdit: (s: Song) => void; onTiming: (s: Song) => void; onInvite: () => void; onNew: () => void; onDelete: (id: number) => void }) {
-  return <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12"><div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">今日の練習</p><h1 className="font-jp text-3xl font-bold tracking-tight sm:text-4xl">어떤 노래를 적어볼까요?</h1><p className="mt-2 text-sm text-muted-foreground">가사를 듣고, 천천히 한 글자씩 기록해 보세요.</p></div>{isAdmin && <div className="flex gap-2"><Button variant="outline" onClick={onInvite}><UserPlus data-icon="inline-start" />친구 초대</Button><Button onClick={onNew}><Plus data-icon="inline-start" />새 곡 등록</Button></div>}</div><div className="mb-8 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3"><div className="rounded-xl border border-border bg-card p-3"><p className="text-xs text-muted-foreground">전체 곡</p><p className="mt-1 text-2xl font-bold">{songs.length}</p></div><div className="rounded-xl border border-border bg-card p-3"><p className="text-xs text-muted-foreground">연속 학습</p><p className="mt-1 text-2xl font-bold">7<span className="ml-1 text-sm font-normal">일</span></p></div><div className="rounded-xl border border-border bg-card p-3"><p className="text-xs text-muted-foreground">푼 문장</p><p className="mt-1 text-2xl font-bold">24</p></div></div><div className="grid gap-4 lg:grid-cols-2">{songs.map(song => <article key={song.id} className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:shadow-lg"><div className="flex items-start justify-between gap-3"><div><div className="mb-2 flex flex-wrap items-center gap-2">{!song.timed && isAdmin && <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300"><Clock3 className="mr-1 inline size-3" />타이밍 미설정</span>}{!song.timed && !isAdmin && <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">준비 중</span>}<span className="text-xs text-muted-foreground">{song.sentences.length}문장</span></div><h2 className="font-jp text-xl font-bold">{song.title}</h2><p className="mt-1 text-sm text-muted-foreground">{song.artist}</p></div><div className="grid size-11 place-items-center rounded-2xl bg-secondary text-secondary-foreground"><Music2 className="size-5" /></div></div><div className="mt-6"><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">내 정답 <b className="text-foreground">{Math.round(song.sentences.length * song.progress / 100)} / {song.sentences.length}</b></span><span className="font-semibold text-primary">{song.progress}%</span></div><ProgressBar value={song.progress} /></div>{song.timed || isAdmin ? <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4"><div className="flex gap-1">{isAdmin && <><button onClick={() => onTiming(song)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" title="타이밍 설정"><Clock3 className="size-4" /></button><button onClick={() => onEdit(song)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" title="편집"><FilePenLine className="size-4" /></button><button onClick={() => onDelete(song.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-destructive" title="삭제"><Trash2 className="size-4" /></button></>}</div><Button size="sm" onClick={() => onSelect(song)}>{song.progress ? '이어서 풀기' : '시작하기'}<ChevronRight data-icon="inline-end" /></Button></div> : <div className="mt-5 border-t border-border pt-4 text-center text-sm text-muted-foreground">관리자가 타이밍을 준비하고 있어요</div>}</article>)}</div></main>
-}
-
-function Study({ song, onBack }: { song: Song; onBack: () => void }) {
-  const [current, setCurrent] = useState(1); const [answer, setAnswer] = useState(''); const [translation, setTranslation] = useState(''); const [result, setResult] = useState<boolean | null>(null); const [revealed, setRevealed] = useState(false); const [repeat, setRepeat] = useState(false); const [speed, setSpeed] = useState('1');
-  const sentence = song.sentences[current - 1]; const correct = result === true;
-  const submit = () => { if (!answer.trim() || !translation.trim()) return; setResult(answer.trim() === sentence.jp.trim()); setRevealed(true) }
-  const next = () => { if (current < song.sentences.length) { setCurrent(current + 1); setAnswer(''); setTranslation(''); setResult(null); setRevealed(false) } else onBack() }
-  return <main className="study-page mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10"><button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" />곡 목록</button><div className="grid gap-6 lg:grid-cols-[1fr_320px]"><section><div className="aspect-video overflow-hidden rounded-2xl bg-slate-950 shadow-lg"><div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400"><div className="grid size-14 place-items-center rounded-full border border-slate-700 bg-slate-900"><Play className="ml-1 size-6 fill-current" /></div><span className="text-xs">YouTube 플레이어 미리보기</span></div></div><div className="mt-5 flex flex-wrap items-center gap-2"><button className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"><Headphones className="size-4" />구간 듣기</button><button className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"><Pause className="size-4" />멈추기</button><label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" checked={repeat} onChange={e => setRepeat(e.target.checked)} className="accent-primary" />반복</label><select value={speed} onChange={e => setSpeed(e.target.value)} className="rounded-lg border border-border bg-background px-2 py-2 text-sm"><option value="1">1배속</option><option value="0.75">0.75배속</option><option value="0.5">0.5배속</option></select></div><div className="mt-8 flex items-end justify-between"><div><p className="text-xs font-semibold uppercase tracking-widest text-primary">{song.title}</p><h1 className="mt-2 text-2xl font-bold">문장 {current} <span className="font-normal text-muted-foreground">/ {song.sentences.length} · 정답 {Math.max(0, current - 1)}</span></h1></div><span className="text-sm text-muted-foreground">시도 {result === null ? 0 : 1}회</span></div><div className="mt-5 rounded-2xl border border-border bg-card p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기</label>{result !== null && <span className={result ? 'stamp stamp-ok' : 'stamp stamp-no'}>{result ? '〇 정답' : '✕ 오답'}</span>}</div><textarea id="jp-answer" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); submit() } }} disabled={revealed} placeholder="들은 문장을 일본어로 적어 보세요" className="jp-writing min-h-28 w-full resize-none rounded-xl border-2 border-dashed border-border bg-background p-4 text-lg outline-none focus:border-primary disabled:opacity-80" /><label htmlFor="ko-answer" className="mt-5 block text-sm font-semibold">한국어 해석 <span className="font-normal text-muted-foreground">(선택)</span></label><input id="ko-answer" value={translation} onChange={e => setTranslation(e.target.value)} placeholder="문장의 뜻을 적어 보세요" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" disabled={revealed} />{revealed && <div className="mt-5 rounded-xl bg-muted/60 p-4 text-sm"><p className="font-semibold">{correct ? '잘했어요! 정확하게 적었어요.' : '조금 달라요. 다시 살펴볼까요?'}</p>{!correct && <p className="mt-2 text-muted-foreground">내 답: <del className="text-destructive">{answer || ' (비어 있음)'}</del></p>}<p className="mt-3 font-jp text-lg"><Furigana text={sentence.furigana || sentence.jp} /></p><p className="mt-1 text-muted-foreground">{sentence.ko}</p><p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">내 해석이 맞았나요? <button className="ml-2 font-bold text-primary">〇</button><button className="ml-2 font-bold text-destructive">✕</button></p></div>}{!revealed ? <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button className="flex-1" onClick={submit}>채점하기 <Check data-icon="inline-end" /></Button><button onClick={() => { setRevealed(true); setResult(false) }} className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-muted">모르겠어요 · 정답 보기</button></div> : <Button onClick={next} className="mt-5 w-full">{current === song.sentences.length ? '목록으로' : '다음 문장'}<ChevronRight data-icon="inline-end" /></Button>}</div></section><aside><div className="rounded-2xl border border-border bg-card p-4"><h2 className="mb-3 text-sm font-semibold">문장 목록</h2><div className="grid grid-cols-6 gap-2 sm:grid-cols-8 lg:grid-cols-5">{song.sentences.map((_, i) => <button key={i} onClick={() => { setCurrent(i + 1); setResult(null); setRevealed(false); setAnswer('') }} className={`grid aspect-square place-items-center rounded-lg border text-sm font-semibold ${current === i + 1 ? 'border-primary bg-primary/10 text-primary' : i < current ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'border-border text-muted-foreground'}`}>{i + 1}</button>)}</div></div><div className="mt-4 rounded-2xl border border-border bg-card p-4"><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-semibold">친구들 기록</h2><Users className="size-4 text-muted-foreground" /></div>{[['유나', 42], ['민지', 75], ['하루', 25]].sort((a,b) => Number(b[1])-Number(a[1])).map(([name, value]) => <div key={String(name)} className="mb-4 last:mb-0"><div className="mb-1 flex justify-between text-xs"><span>{name}{name === '유나' && <span className="ml-1 text-primary">(나)</span>}</span><span className="text-muted-foreground">{value}%</span></div><ProgressBar value={Number(value)} /></div>)}</div></aside></div></main>
-}
-
-function Editor({ song, onBack, onTiming }: { song?: Song; onBack: () => void; onTiming: (s: Song) => void }) {
-  const [jp, setJp] = useState(song?.sentences.map(s => s.jp).join('\n') || '風が窓辺で静かに歌う\n新しいページを開こう\n小さな勇気を��ケッ���に入れて'); const [ko, setKo] = useState(song?.sentences.map(s => s.ko).join('\n') || '바람이 창가에서 조용히 노래해\n새로운 페이지를 열어 보자\n작은 용기를 주머니에 넣고'); const [rows, setRows] = useState<Sentence[] | null>(null); const lines = useMemo(() => jp.split('\n'), [jp]); const koLines = useMemo(() => ko.split('\n'), [ko]);
-  const split = () => setRows(lines.map((line, i) => ({ jp: line, ko: koLines[i] || '', furigana: line, start: i * 8 }))); const current = rows || [];
-  return <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6"><button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="size-4" />곡 목록</button><div className="mb-8"><p className="text-xs font-semibold uppercase tracking-widest text-primary">관리자 · 곡 {song ? '편집' : '등록'}</p><h1 className="mt-2 text-3xl font-bold">가사를 문장으로 정리해요</h1></div><div className="grid gap-4 sm:grid-cols-3"><label className="text-sm font-semibold">곡 제목<input defaultValue={song?.title} placeholder="예: 별빛 산책" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 font-jp font-normal outline-none focus:ring-2 focus:ring-ring" /></label><label className="text-sm font-semibold">가수<input defaultValue={song?.artist} placeholder="가수 이름" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 font-normal outline-none focus:ring-2 focus:ring-ring" /></label><label className="text-sm font-semibold">YouTube 링크<input placeholder="https://youtube.com/..." className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 font-normal outline-none focus:ring-2 focus:ring-ring" /></label></div><div className="mt-6 grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold">일본어 가사<textarea value={jp} onChange={e => setJp(e.target.value)} className="jp-writing mt-2 min-h-48 w-full rounded-xl border border-input bg-background p-4 font-jp leading-8 outline-none focus:ring-2 focus:ring-ring" /></label><label className="text-sm font-semibold">한국어 해석<textarea value={ko} onChange={e => setKo(e.target.value)} className="mt-2 min-h-48 w-full rounded-xl border border-input bg-background p-4 leading-8 outline-none focus:ring-2 focus:ring-ring" /></label></div><div className="mt-4 flex flex-wrap items-center gap-3"><Button onClick={split}><Copy data-icon="inline-start" />문장 나누기</Button>{lines.length !== koLines.length && <p className="text-sm text-destructive">일본어와 한국어 줄 수가 달라요. ({lines.length}줄 / {koLines.length}줄)</p>}<button className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"><Settings2 className="size-4" />한자 읽기 자동 생성</button><span className="text-xs text-muted-foreground">후리가나는 漢字&#123;かんじ&#125; 형식으로 직접 수정할 수 있어요.</span></div>{rows && <div className="mt-6 flex flex-col gap-3">{current.map((row, i) => <div key={i} className={`rounded-xl border p-4 ${!row.jp || !row.ko ? 'border-destructive bg-destructive/5' : 'border-border bg-card'}`}><div className="mb-3 flex items-center justify-between"><span className="grid size-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span><span className="font-jp text-sm text-muted-foreground"><Furigana text={row.furigana || row.jp} /></span></div><div className="grid gap-2 sm:grid-cols-2"><input defaultValue={row.jp} className="rounded-lg border border-input bg-background px-3 py-2 font-jp" /><input defaultValue={row.ko} className="rounded-lg border border-input bg-background px-3 py-2" /></div></div>)}</div>}<div className="mt-8 flex justify-end gap-2 border-t border-border pt-5"><Button variant="outline" onClick={onBack}>취소</Button><Button onClick={() => onTiming({ id: Date.now(), title: song?.title || '새로운 노래', artist: song?.artist || '아티스트', timed: false, progress: 0, sentences: rows || [] })}>저장하고 타이밍 맞추기<ChevronRight data-icon="inline-end" /></Button></div></main>
-}
-
-function Timing({ song, onBack, onStudy }: { song: Song; onBack: () => void; onStudy: (s: Song) => void }) { const [active, setActive] = useState(0); const [times, setTimes] = useState(song.sentences.map(s => s.start)); const stamp = () => { setTimes(t => t.map((x, i) => i === active ? Number((x + 3.4).toFixed(1)) : x)); if (active < song.sentences.length - 1) setActive(active + 1) }; return <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6"><button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="size-4" />곡 목록</button><div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-xs font-semibold uppercase tracking-widest text-primary">관리자 · 타이밍 설정</p><h1 className="mt-2 text-3xl font-bold">문장마다 시작점을 찍어요</h1></div><span className="rounded-full bg-muted px-3 py-1 text-sm font-mono">00:{String(times[active] || 0).padStart(2, '0')} / 02:48</span></div><div className="aspect-video overflow-hidden rounded-2xl bg-slate-950"><div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400"><button className="grid size-16 place-items-center rounded-full bg-white text-slate-950"><Play className="ml-1 size-7 fill-current" /></button><span className="text-xs">YouTube 플레이어 미리보기</span></div></div><div className="mt-5 flex flex-wrap gap-2"><Button variant="outline"><RotateCcw data-icon="inline-start" />처음부터 다시 찍기</Button><Button variant="outline"><Pause data-icon="inline-start" />일시정지</Button><span className="self-center text-sm text-muted-foreground">스페이스바로도 찍을 수 있어요</span></div><button onClick={stamp} className="mt-6 w-full rounded-2xl bg-primary p-5 text-left text-primary-foreground shadow-lg transition hover:opacity-90"><span className="text-xs font-semibold uppercase tracking-widest opacity-70">현재 문장 {active + 1}</span><span className="mt-2 flex items-center justify-between gap-3"><span className="font-jp text-lg font-bold">{song.sentences[active]?.jp || '문장을 먼저 나눠 주세요'}</span><Clock3 /></span><span className="mt-2 block text-sm opacity-80">지금 시간을 시작 지점으로 찍기 →</span></button><div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card"><div className="border-b border-border px-4 py-3 text-sm font-semibold">문장 시작 시간</div>{song.sentences.map((s, i) => <div key={i} className={`flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0 ${i === active ? 'bg-primary/5' : ''}`}><span className="grid size-7 place-items-center rounded-full bg-muted text-xs font-bold">{i + 1}</span><span className="min-w-48 flex-1 font-jp text-sm">{s.jp}</span><span className="font-mono text-sm text-primary">{times[i].toFixed(1)}s</span><div className="flex gap-1"><button className="rounded border border-border px-2 py-1 text-xs">−0.2</button><button className="rounded border border-border px-2 py-1 text-xs">+0.2</button><button onClick={() => setActive(i)} className="rounded border border-border px-2 py-1 text-xs">여기부터 다시</button></div></div>)}</div><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={onBack}>타이밍 저장</Button><Button onClick={() => onStudy(song)}>저장하고 직접 풀어보기<ChevronRight data-icon="inline-end" /></Button></div></main> }
-
-function Invite({ onBack }: { onBack: () => void }) { const [email, setEmail] = useState(''); const [invites, setInvites] = useState(['minji@example.com', 'haru@example.com']); const add = () => { if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && !invites.includes(email)) { setInvites([...invites, email]); setEmail('') } }; return <main className="mx-auto max-w-xl px-4 py-8 sm:px-6"><button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="size-4" />곡 목록</button><p className="text-xs font-semibold uppercase tracking-widest text-primary">관리자 · 친구 초대</p><h1 className="mt-2 text-3xl font-bold">함께 공부할 친구를 초대해요</h1><p className="mt-2 text-sm text-muted-foreground">초대된 계정은 구글 로그인 후 받아쓰기만 할 수 있어요.</p><div className="mt-8 rounded-2xl border border-border bg-card p-5"><label className="text-sm font-semibold">구글 이메일 주소<div className="mt-2 flex gap-2"><input value={email} onChange={e => setEmail(e.target.value)} placeholder="friend@gmail.com" className="h-11 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 outline-none focus:ring-2 focus:ring-ring" /><Button onClick={add}><Send data-icon="inline-start" />추가</Button></div></label>{email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && <p className="mt-2 text-xs text-destructive">올바른 이메일 형식이 아니에요.</p>}<div className="mt-6 flex flex-col gap-2">{invites.map(item => <div key={item} className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-3 text-sm"><span>{item}</span><button onClick={() => setInvites(invites.filter(i => i !== item))} className="text-muted-foreground hover:text-destructive">빼기</button></div>)}</div></div></main> }
-
-function Login({ onLogin }: { onLogin: () => void }) { return <main className="grid min-h-screen place-items-center px-4"><div className="w-full max-w-sm text-center"><div className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-xl"><BookOpen className="size-8" /></div><h1 className="mt-6 text-3xl font-bold tracking-tight">카키토리 노트</h1><p className="mt-1 font-jp text-sm text-muted-foreground">書き取りノート</p><p className="mt-8 text-sm leading-7 text-muted-foreground">좋아하는 J-POP을 들으며<br />일본어 문장을 천천히 내 것으로 만들어요.</p><Button onClick={onLogin} className="mt-8 h-12 w-full bg-white text-slate-800 shadow-sm ring-1 ring-border hover:bg-muted"><span className="mr-2 font-bold text-red-500">G</span>구글로 로그인</Button><p className="mt-5 text-xs text-muted-foreground">초대받은 친구와 관리자만 이용할 수 있어요.</p></div></main> }
-
-export default function Page() { const [view, setView] = useState<'login' | 'library' | 'study' | 'editor' | 'timing' | 'invite'>('login'); const [selected, setSelected] = useState<Song>(seedSongs[0]); const [songs, setSongs] = useState(seedSongs); const [dark, setDark] = useState(false); const isAdmin = true; const goLibrary = () => setView('library'); return <div className={dark ? 'dark min-h-screen' : 'min-h-screen'}>{view !== 'login' && <Header isAdmin={isAdmin} onHome={goLibrary} onDark={() => setDark(!dark)} />}{view === 'login' && <Login onLogin={goLibrary} />}{view === 'library' && <Library songs={songs} isAdmin={isAdmin} onSelect={s => { setSelected(s); setView('study') }} onEdit={s => { setSelected(s); setView('editor') }} onTiming={s => { setSelected(s); setView('timing') }} onInvite={() => setView('invite')} onNew={() => { setSelected(seedSongs[0]); setView('editor') }} onDelete={id => setSongs(songs.filter(s => s.id !== id))} />}{view === 'study' && <Study song={selected} onBack={goLibrary} />}{view === 'editor' && <Editor song={selected} onBack={goLibrary} onTiming={s => { setSelected(s); setView('timing') }} />}{view === 'timing' && <Timing song={selected} onBack={goLibrary} onStudy={s => { setSelected(s); setView('study') }} />}{view === 'invite' && <Invite onBack={goLibrary} />}</div> }
