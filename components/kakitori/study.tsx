@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Users } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Trophy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrect, useStore } from '@/lib/store'
 import { baseText } from '@/lib/ruby'
@@ -9,6 +9,7 @@ import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
 import type { Song, User } from '@/lib/types'
 import { BackButton, Furigana, ProgressBar } from './furigana'
+import { Results } from './results'
 
 type Result = { ok: boolean; input: string; revealed: boolean }
 
@@ -26,6 +27,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const [result, setResult] = useState<Result | null>(null)
   const [repeat, setRepeat] = useState(false)
   const [speed, setSpeed] = useState('1')
+  const [showResults, setShowResults] = useState(false)
   const drafts = useRef<Record<number, { answer: string; translation: string }>>({})
   const answerRef = useRef<HTMLTextAreaElement>(null)
   const yt = useYouTube(song.youtubeId)
@@ -40,6 +42,44 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
         <BackButton onClick={onBack} />
         <p className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">이 곡에는 아직 문장이 없어요.</p>
       </main>
+    )
+  }
+
+  const attempted = (k: number) => !!(prog[k]?.tries || prog[k]?.revealed)
+  const allDone = L.every((_, k) => attempted(k))
+  const firstUndone = Math.max(0, L.findIndex((_, k) => !attempted(k)))
+  const openResults = () => {
+    drafts.current[current] = { answer, translation }
+    yt.stop()
+    setShowResults(true)
+    window.scrollTo(0, 0)
+  }
+
+  if (showResults) {
+    return (
+      <Results
+        song={song}
+        progress={prog}
+        onBack={onBack}
+        onReview={(k) => {
+          const d = drafts.current[k]
+          setAnswer(d?.answer ?? '')
+          setTranslation(d?.translation ?? '')
+          setResult(null)
+          setCurrent(k)
+          setShowResults(false)
+          window.scrollTo(0, 0)
+        }}
+        onRestart={() => {
+          actions.saveProgress(song.id, {})
+          drafts.current = {}
+          setAnswer('')
+          setTranslation('')
+          setResult(null)
+          setCurrent(0)
+          setShowResults(false)
+        }}
+      />
     )
   }
 
@@ -69,11 +109,11 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
       return
     }
     const ok = input === baseText(sentence.ruby).trim()
-    save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1 } })
+    save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim() } })
     setResult({ ok, input, revealed: false })
   }
   const reveal = () => {
-    save({ ...prog, [current]: { ...p, revealed: true } })
+    save({ ...prog, [current]: { ...p, revealed: true, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation } })
     setResult({ ok: false, input: answer.trim(), revealed: true })
   }
   const retry = () => {
@@ -180,9 +220,13 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
             ) : (
               <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                 {!result.ok && <Button variant="outline" className="h-10" onClick={retry}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
-                <Button className="h-10 flex-1" onClick={() => (current === total - 1 ? onBack() : move(current + 1))}>
-                  {current === total - 1 ? '목록으로' : '다음 문장'}<ChevronRight data-icon="inline-end" />
-                </Button>
+                {current === total - 1 && allDone ? (
+                  <Button className="h-10 flex-1" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
+                ) : current === total - 1 ? (
+                  <Button className="h-10 flex-1" onClick={() => move(firstUndone)}>안 푼 문장으로<ChevronRight data-icon="inline-end" /></Button>
+                ) : (
+                  <Button className="h-10 flex-1" onClick={() => move(current + 1)}>다음 문장<ChevronRight data-icon="inline-end" /></Button>
+                )}
               </div>
             )}
           </div>
@@ -194,6 +238,9 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
         </section>
 
         <aside className="min-w-0">
+          {allDone && (
+            <Button onClick={openResults} className="mb-4 h-11 w-full"><Trophy data-icon="inline-start" />결과 보기</Button>
+          )}
           <div className="rounded-2xl border border-border bg-card p-4">
             <h2 className="mb-3 text-sm font-semibold">문장 목록</h2>
             <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 lg:grid-cols-5">

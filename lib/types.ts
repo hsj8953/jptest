@@ -21,6 +21,10 @@ export type LineProgress = {
   tries?: number
   ko?: boolean
   revealed?: boolean
+  /** 마지막으로 제출한 일본어 받아쓰기 */
+  answer?: string
+  /** 마지막으로 적은 한국어 해석 */
+  translation?: string
 }
 export type SongProgress = Record<number, LineProgress>
 
