@@ -162,6 +162,24 @@
 
 
 @layer base {
+  /* Tailwind v4는 버튼 기본 커서가 화살표라서 손가락 모양으로 */
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  select:not(:disabled),
+  summary,
+  input[type='checkbox']:not(:disabled),
+  label:has(> input[type='checkbox']:not(:disabled)) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+  button,
+  select {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 150ms;
+  }
   * {
     @apply border-border outline-ring/50;
   }

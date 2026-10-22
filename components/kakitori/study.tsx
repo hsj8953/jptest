@@ -273,12 +273,12 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
                 const tone = i === current
                   ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
                   : st?.ok
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60'
                     : st?.tries || st?.revealed
-                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300'
-                      : 'border-border text-muted-foreground'
+                      ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/60'
+                      : 'border-border text-muted-foreground hover:border-primary/50 hover:bg-muted hover:text-foreground'
                 return (
-                  <button key={i} onClick={() => move(i)} className={`grid aspect-square place-items-center rounded-lg border text-sm font-semibold ${tone}`} aria-label={`${i + 1}번 문장`} aria-current={i === current}>
+                  <button key={i} onClick={() => move(i)} className={`grid aspect-square place-items-center rounded-lg border text-sm font-semibold transition hover:-translate-y-px ${tone}`} aria-label={`${i + 1}번 문장`} aria-current={i === current}>
                     {i + 1}
                   </button>
                 )
