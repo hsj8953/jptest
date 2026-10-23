@@ -7,10 +7,12 @@ import { NextResponse } from 'next/server'
 import { baseText } from '@/lib/ruby'
 
 export const runtime = 'nodejs'
+export const maxDuration = 26
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? ''
 const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim().toLowerCase()
-const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
+// 앞에서부터 시도하고, 모델을 못 찾으면 다음 모델로 넘어가요
+const MODELS = [process.env.GEMINI_MODEL, 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'].filter((m, i, a): m is string => !!m && a.indexOf(m) === i)
 const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'))
 
 type AiLine = { ruby?: string; unsure?: string[] }
@@ -46,35 +48,59 @@ export async function POST(req: Request) {
   const lines = Array.isArray(body?.lines) ? body.lines.filter((l): l is string => typeof l === 'string').map((l) => baseText(l)) : []
   if (!lines.length || lines.length > 120) return NextResponse.json({ error: 'bad_request' }, { status: 400 })
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: PROMPT }] },
-      contents: [{ role: 'user', parts: [{ text: JSON.stringify({ lines }) }] }],
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            lines: {
-              type: 'ARRAY',
-              items: {
-                type: 'OBJECT',
-                properties: { ruby: { type: 'STRING' }, unsure: { type: 'ARRAY', items: { type: 'STRING' } } },
-                required: ['ruby', 'unsure'],
-              },
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: PROMPT }] },
+    contents: [{ role: 'user', parts: [{ text: JSON.stringify({ lines }) }] }],
+    generationConfig: {
+      temperature: 0.2,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          lines: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: { ruby: { type: 'STRING' }, unsure: { type: 'ARRAY', items: { type: 'STRING' } } },
+              required: ['ruby', 'unsure'],
             },
           },
-          required: ['lines'],
         },
+        required: ['lines'],
       },
-    }),
+    },
   })
-  if (!res.ok) {
-    const status = res.status === 429 ? 429 : 502
-    return NextResponse.json({ error: status === 429 ? 'rate_limited' : 'ai_failed' }, { status })
+
+  let res: Response | null = null
+  let detail = ''
+  for (const model of MODELS) {
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: payload,
+        signal: AbortSignal.timeout(24000),
+      })
+    } catch (e) {
+      const timeout = (e as Error).name === 'TimeoutError'
+      return NextResponse.json({ error: timeout ? 'timeout' : 'ai_failed', detail: timeout ? 'AI 응답 시간 초과' : String((e as Error).message).slice(0, 200) }, { status: 504 })
+    }
+    if (res.ok) break
+    const errText = await res.text().catch(() => '')
+    let msg = errText
+    try {
+      msg = (JSON.parse(errText) as { error?: { message?: string } }).error?.message ?? errText
+    } catch {
+      /* 텍스트 그대로 */
+    }
+    detail = `${model}: ${res.status} ${msg}`.slice(0, 300)
+    // 모델을 못 찾은 경우만 다음 모델로
+    if (res.status !== 404 && !(res.status === 400 && /model/i.test(msg))) break
+  }
+  if (!res || !res.ok) {
+    const status = res?.status === 429 ? 429 : res?.status === 400 || res?.status === 403 ? 400 : 502
+    const error = res?.status === 429 ? 'rate_limited' : res?.status === 400 && /api key/i.test(detail) ? 'bad_key' : res?.status === 403 ? 'bad_key' : 'ai_failed'
+    return NextResponse.json({ error, detail }, { status })
   }
 
   const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
@@ -83,7 +109,7 @@ export async function POST(req: Request) {
   try {
     parsed = JSON.parse(text)
   } catch {
-    return NextResponse.json({ error: 'ai_failed' }, { status: 502 })
+    return NextResponse.json({ error: 'ai_failed', detail: 'AI 응답을 읽지 못했어요' }, { status: 502 })
   }
 
   // 원문 글자가 바뀐 줄은 버려요 (null)
