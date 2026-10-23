@@ -47,3 +47,18 @@ export function splitRuby(s: string): Segment[] {
 export function joinRuby(segs: Segment[]) {
   return segs.map((g) => (g.kanji && g.reading ? `${g.text}{${g.reading}}` : g.text)).join('')
 }
+
+// 겉모양은 일반 한자와 똑같지만 번호가 다른 글자들
+//   ⺀-⻿ 부수 보충, ⼀-⿟ 강희 부수(예: ⼈ ⾔ ⽼), 豈-﫿 호환 한자, 丽-𯨟 호환 한자 보충
+// 가사 사이트나 PDF에서 복사할 때 섞여 들어오는 경우가 있어서, 일반 한자로 바꿔요.
+const LOOKALIKE = /[⺀-⻿⼀-⿟豈-﫿]|[\uD87E][\uDC00-\uDE1F]/g
+
+/** 부수·호환 한자를 일반 한자로 바꿔요. 다른 글자(가나, 기호, 띄어쓰기)는 그대로예요. */
+export function normalizeKanji(s: string) {
+  return String(s ?? '').replace(LOOKALIKE, (c) => c.normalize('NFKC'))
+}
+
+/** 채점용 정답 문장 (읽기 표기 제거 + 한자 정리 + 앞뒤 공백 제거) */
+export function answerOf(ruby: string) {
+  return normalizeKanji(baseText(ruby)).trim()
+}

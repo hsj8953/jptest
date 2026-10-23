@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Trophy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrect, useStore, watchScores, type Score } from '@/lib/store'
-import { baseText } from '@/lib/ruby'
+import { answerOf, normalizeKanji } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
 import type { Song, User } from '@/lib/types'
@@ -115,7 +115,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   }
 
   const submit = () => {
-    const input = answer.trim()
+    const input = normalizeKanji(answer).trim()
     if (!input) {
       answerRef.current?.focus()
       return
@@ -125,13 +125,13 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
       koRef.current?.focus()
       return
     }
-    const ok = input === baseText(sentence.ruby).trim()
+    const ok = input === answerOf(sentence.ruby)
     save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim() } })
     setResult({ ok, input, revealed: false })
   }
   const reveal = () => {
     save({ ...prog, [current]: { ...p, revealed: true, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation } })
-    setResult({ ok: false, input: answer.trim(), revealed: true })
+    setResult({ ok: false, input: normalizeKanji(answer).trim(), revealed: true })
   }
   const retry = () => {
     setResult(null)
@@ -246,13 +246,13 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
                 {!result.revealed ? (
                   <>
                     <p className="font-semibold">{result.ok ? '잘했어요! 한 글자도 틀리지 않았어요.' : '조금 달라요. 빨간 부분을 살펴볼까요?'}</p>
-                    {!result.ok && <DiffView answer={baseText(sentence.ruby)} input={result.input} />}
+                    {!result.ok && <DiffView answer={answerOf(sentence.ruby)} input={result.input} />}
                   </>
                 ) : (
                   <p className="font-semibold">정답을 확인해 보세요.</p>
                 )}
                 <p className="mt-4 text-xs font-semibold text-muted-foreground">정답</p>
-                <p className="mt-1 font-jp text-xl leading-loose"><Furigana text={sentence.ruby} /></p>
+                <p className="mt-1 font-jp text-xl leading-loose"><Furigana text={normalizeKanji(sentence.ruby)} /></p>
                 <p className="mt-4 text-sm font-semibold text-muted-foreground">원래 해석</p>
                 <p className="mt-1 text-base leading-7">{sentence.ko || <span className="text-muted-foreground">해석 없음</span>}</p>
                 {translation.trim() && (

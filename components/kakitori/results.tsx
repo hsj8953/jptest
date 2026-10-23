@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Eye, RotateCcw, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { baseText, parseRuby } from '@/lib/ruby'
+import { answerOf, normalizeKanji, parseRuby } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import type { Song, SongProgress } from '@/lib/types'
 import { ProgressBar } from './furigana'
@@ -40,13 +40,13 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
   const rows = useMemo<Row[]>(() =>
     song.lines.map((l, index) => {
       const p = progress[index] ?? {}
-      const base = baseText(l.ruby).trim()
-      const answer = (p.answer ?? '').trim()
+      const base = answerOf(l.ruby)
+      const answer = normalizeKanji(p.answer ?? '').trim()
       const { ans, inp } = diffChars(base, answer)
       const matched = ans.filter((c) => !c.bad).length
       const denom = Math.max(Array.from(base).length, Array.from(answer).length)
       return {
-        index, ruby: l.ruby, ko: l.ko, answer, translation: (p.translation ?? '').trim(),
+        index, ruby: normalizeKanji(l.ruby), ko: l.ko, answer, translation: (p.translation ?? '').trim(),
         ok: answer === base, revealed: !!p.revealed, tries: p.tries ?? 0, ans, inp, matched, denom,
       }
     }), [song.lines, progress])

@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button'
 import { actions, newSongId } from '@/lib/store'
 import { generateFurigana } from '@/lib/furigana'
 import { RubyEditable } from './ruby-edit'
-import { KANJI, baseText } from '@/lib/ruby'
+import { KANJI, baseText, normalizeKanji } from '@/lib/ruby'
 import { parseYouTubeId } from '@/lib/youtube'
 import type { Line, Song } from '@/lib/types'
 import { BackButton, Furigana } from './furigana'
 
-const splitLines = (t: string) => t.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+// 붙여넣은 가사의 부수·호환 한자는 일반 한자로 정리해요
+const splitLines = (t: string) => normalizeKanji(t).split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
 const inputCls = 'mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 font-normal outline-none focus:ring-2 focus:ring-ring'
 
 export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => void; onSaved: (id: string) => void }) {
@@ -60,7 +61,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
 
   const save = async () => {
     const youtubeId = yt.trim() ? parseYouTubeId(yt) : null
-    const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: l.ruby.trim(), ko: l.ko.trim(), start: l.start ?? null, ...(l.check?.length ? { check: l.check } : {}) }))
+    const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: normalizeKanji(l.ruby).trim(), ko: l.ko.trim(), start: l.start ?? null, ...(l.check?.length ? { check: l.check } : {}) }))
     if (!title.trim()) return setError('곡 제목을 적어 주세요.')
     if (ytInvalid) return setError('유튜브 링크 형식을 확인해 주세요.')
     if (!lines.length) return setError('가사를 붙여넣고 ‘문장 나누기’를 눌러 주세요.')
