@@ -186,10 +186,21 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
               <label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기 <span className="font-normal text-destructive">*</span></label>
               {result && !result.revealed && <span className={result.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{result.ok ? '〇 정답' : '✕ 오답'}</span>}
             </div>
-            <div className={`relative ${result && !result.revealed && !result.ok ? 'stamp-shake' : ''}`} key={`wrap-${current}-${p.tries ?? 0}`}>
+            <div className={`relative ${result && !result.revealed ? (result.ok ? 'answer-ok' : 'answer-no stamp-shake') : ''}`} key={`wrap-${current}-${p.tries ?? 0}`}>
             {result && !result.revealed && (
               <span className={`hanko ${result.ok ? 'hanko-ok' : 'hanko-no'}`} role="img" aria-label={result.ok ? '정답 도장' : '오답 도장'}>
-                {result.ok ? '〇' : '✕'}
+                <svg viewBox="0 0 100 100" aria-hidden="true">
+                  <circle className="hanko-rim" cx="50" cy="50" r="45" />
+                  {result.ok ? (
+                    <circle className="hanko-mark" cx="50" cy="50" r="24" pathLength={1} />
+                  ) : (
+                    <>
+                      <path className="hanko-mark" d="M32 32 L68 68" pathLength={1} />
+                      <path className="hanko-mark hanko-mark-2" d="M68 32 L32 68" pathLength={1} />
+                    </>
+                  )}
+                </svg>
+                <span className="hanko-label">{result.ok ? '正解' : '不正解'}</span>
               </span>
             )}
             <textarea
@@ -255,18 +266,18 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
 
             {!result ? (
               <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                <Button className="h-10 flex-1" onClick={submit} disabled={!answer.trim() || !translation.trim()}>채점하기 <Check data-icon="inline-end" /></Button>
-                <button onClick={reveal} className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-muted">모르겠어요 · 정답 보기</button>
+                <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={submit} disabled={!answer.trim() || !translation.trim()}>채점하기 <Check data-icon="inline-end" /></Button>
+                <button onClick={reveal} className="h-11 rounded-lg px-4 text-sm text-muted-foreground hover:bg-muted sm:h-10">모르겠어요 · 정답 보기</button>
               </div>
             ) : (
               <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                {!result.ok && <Button variant="outline" className="h-10" onClick={retry}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
+                {!result.ok && <Button variant="outline" className="h-12 w-full text-base sm:h-10 sm:w-auto sm:text-sm" onClick={retry}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
                 {current === total - 1 && allDone ? (
-                  <Button className="h-10 flex-1" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
+                  <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
                 ) : current === total - 1 ? (
-                  <Button className="h-10 flex-1" onClick={() => move(firstUndone)}>안 푼 문장으로<ChevronRight data-icon="inline-end" /></Button>
+                  <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(firstUndone)}>안 푼 문장으로<ChevronRight data-icon="inline-end" /></Button>
                 ) : (
-                  <Button className="h-10 flex-1" onClick={() => move(current + 1)}>다음 문장<ChevronRight data-icon="inline-end" /></Button>
+                  <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(current + 1)}>다음 문장<ChevronRight data-icon="inline-end" /></Button>
                 )}
               </div>
             )}
