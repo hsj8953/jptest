@@ -154,6 +154,7 @@ function aiErrorText(code?: string) {
   if (code === 'no_key') return 'API 키가 설정되지 않음'
   if (code === 'rate_limited') return '무료 사용량 초과, 잠시 후 다시'
   if (code === 'timeout') return '응답 시간 초과'
+  if (code === 'busy') return 'Gemini 서버가 바빠요. 잠시 후 다시 눌러 주세요'
   if (code === 'bad_key') return 'API 키가 올바르지 않음'
   if (code === 'forbidden' || code === 'unauthorized') return '관리자 확인 실패'
   return '연결 오류'

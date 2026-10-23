@@ -73,33 +73,45 @@ export async function POST(req: Request) {
 
   let res: Response | null = null
   let detail = ''
-  for (const model of MODELS) {
-    try {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-        body: payload,
-        signal: AbortSignal.timeout(24000),
-      })
-    } catch (e) {
-      const timeout = (e as Error).name === 'TimeoutError'
-      return NextResponse.json({ error: timeout ? 'timeout' : 'ai_failed', detail: timeout ? 'AI 응답 시간 초과' : String((e as Error).message).slice(0, 200) }, { status: 504 })
+  const started = Date.now()
+  const busy = (status: number) => status === 503 || status === 500 || status === 502
+  outer: for (const model of MODELS) {
+    // 바쁠 때(503)는 같은 모델로 한 번 더 시도한 뒤 다음 모델로 넘어가요
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const left = 24000 - (Date.now() - started)
+      if (left < 3000) break outer
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+          body: payload,
+          signal: AbortSignal.timeout(left),
+        })
+      } catch (e) {
+        const timeout = (e as Error).name === 'TimeoutError'
+        return NextResponse.json({ error: timeout ? 'timeout' : 'ai_failed', detail: timeout ? 'AI 응답 시간 초과' : String((e as Error).message).slice(0, 200) }, { status: 504 })
+      }
+      if (res.ok) break outer
+      const errText = await res.text().catch(() => '')
+      let msg = errText
+      try {
+        msg = (JSON.parse(errText) as { error?: { message?: string } }).error?.message ?? errText
+      } catch {
+        /* 텍스트 그대로 */
+      }
+      detail = `${model}: ${res.status} ${msg}`.slice(0, 300)
+      if (busy(res.status)) {
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 800))
+        continue
+      }
+      // 모델을 못 찾은 경우는 다음 모델로, 그 밖의 오류는 중단
+      if (res.status === 404 || (res.status === 400 && /model/i.test(msg))) continue outer
+      break outer
     }
-    if (res.ok) break
-    const errText = await res.text().catch(() => '')
-    let msg = errText
-    try {
-      msg = (JSON.parse(errText) as { error?: { message?: string } }).error?.message ?? errText
-    } catch {
-      /* 텍스트 그대로 */
-    }
-    detail = `${model}: ${res.status} ${msg}`.slice(0, 300)
-    // 모델을 못 찾은 경우만 다음 모델로
-    if (res.status !== 404 && !(res.status === 400 && /model/i.test(msg))) break
   }
   if (!res || !res.ok) {
-    const status = res?.status === 429 ? 429 : res?.status === 400 || res?.status === 403 ? 400 : 502
-    const error = res?.status === 429 ? 'rate_limited' : res?.status === 400 && /api key/i.test(detail) ? 'bad_key' : res?.status === 403 ? 'bad_key' : 'ai_failed'
+    const status = res?.status === 429 ? 429 : res && busy(res.status) ? 503 : res?.status === 400 || res?.status === 403 ? 400 : 502
+    const error = res?.status === 429 ? 'rate_limited' : res && busy(res.status) ? 'busy' : res?.status === 400 && /api key/i.test(detail) ? 'bad_key' : res?.status === 403 ? 'bad_key' : 'ai_failed'
     return NextResponse.json({ error, detail }, { status })
   }
 
