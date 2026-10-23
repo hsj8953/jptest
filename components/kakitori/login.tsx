@@ -1,21 +1,50 @@
-import { BookOpen } from 'lucide-react'
+import { BookOpen, Headphones, PenLine, Users } from 'lucide-react'
+import { DictationDemo, FloatingKana } from './login-demo'
 import { Button } from '@/components/ui/button'
 
 export function Login({ onLogin, busy, error }: { onLogin: () => void; busy?: boolean; error?: string }) {
   return (
-    <main className="grid min-h-screen place-items-center px-4">
-      <div className="w-full max-w-sm text-center">
-        <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-xl"><BookOpen className="size-8" /></div>
-        <h1 className="mt-6 text-3xl font-bold tracking-tight">카키토리 노트</h1>
-        <p className="mt-1 font-jp text-sm text-muted-foreground">書き取りノート</p>
-        <p className="mt-8 text-sm leading-7 text-muted-foreground">좋아하는 J-POP을 들으며<br />일본어 문장을 천천히 내 것으로 만들어요.</p>
-        <Button onClick={onLogin} disabled={busy} className="mt-8 h-12 w-full bg-white text-slate-800 shadow-sm ring-1 ring-border hover:bg-slate-100">
-          <span className="mr-2 font-bold text-red-500">G</span>{busy ? '로그인 중…' : '구글로 로그인'}
-        </Button>
-        {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-        <p className="mt-5 text-xs text-muted-foreground">초대받은 친구와 관리자만 이용할 수 있어요.</p>
+    <main className="login-bg relative grid min-h-screen place-items-center overflow-hidden px-4 py-10">
+      <FloatingKana />
+      <div className="relative w-full max-w-sm text-center">
+        <div className="login-rise mx-auto grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-xl" style={{ animationDelay: '0ms' }}>
+          <BookOpen className="size-8" />
+        </div>
+        <h1 className="login-rise mt-6 text-3xl font-bold tracking-tight" style={{ animationDelay: '80ms' }}>카키토리 노트</h1>
+        <p className="login-rise mt-1 font-jp text-sm text-muted-foreground" style={{ animationDelay: '140ms' }}>
+          <ruby>書<rt>か</rt></ruby>き<ruby>取<rt>と</rt></ruby>りノート
+        </p>
+
+        <div className="login-rise mt-8" style={{ animationDelay: '220ms' }}>
+          <DictationDemo />
+        </div>
+
+        <ul className="login-rise mt-6 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground" style={{ animationDelay: '300ms' }}>
+          <li className="flex flex-col items-center gap-1 rounded-xl bg-card/70 px-2 py-2.5 backdrop-blur"><Headphones className="size-4 text-primary" />구간 반복 듣기</li>
+          <li className="flex flex-col items-center gap-1 rounded-xl bg-card/70 px-2 py-2.5 backdrop-blur"><PenLine className="size-4 text-primary" />한 글자씩 채점</li>
+          <li className="flex flex-col items-center gap-1 rounded-xl bg-card/70 px-2 py-2.5 backdrop-blur"><Users className="size-4 text-primary" />친구와 기록 비교</li>
+        </ul>
+
+        <div className="login-rise" style={{ animationDelay: '380ms' }}>
+          <Button onClick={onLogin} disabled={busy} className="mt-8 h-12 w-full bg-white text-base text-slate-800 shadow-md ring-1 ring-border hover:bg-slate-100 hover:shadow-lg">
+            <GoogleIcon />{busy ? '로그인 중…' : '구글로 로그인'}
+          </Button>
+          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+          <p className="mt-5 text-xs text-muted-foreground">초대받은 친구와 관리자만 이용할 수 있어요.</p>
+        </div>
       </div>
     </main>
+  )
+}
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 48 48" className="mr-2 size-5" aria-hidden>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
   )
 }
 
