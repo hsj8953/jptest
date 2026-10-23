@@ -34,7 +34,7 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
   onRestart: () => void
 }) {
   const [onlyWrong, setOnlyWrong] = useState(false)
-  const hue = useSongHue(song)
+  const theme = useSongHue(song)
   const [confirmRestart, setConfirmRestart] = useState(false)
 
   const rows = useMemo<Row[]>(() =>
@@ -60,7 +60,7 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
   const shown = onlyWrong ? rows.filter((r) => !r.ok) : rows
 
   return (
-    <main className="song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(hue)}>
+    <main className="song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(theme)}>
       <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" />곡 목록
       </button>

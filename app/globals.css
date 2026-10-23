@@ -192,18 +192,19 @@
 /* ── 곡별 색 테마 ─────────────────────────────
    style="--song-h: 210" 을 준 요소 아래에서는 포인트 색(primary)이 그 곡의 색으로 바뀌어요 */
 .song-theme {
-  --primary: oklch(0.52 0.16 var(--song-h));
-  --primary-foreground: oklch(0.985 0 0);
-  --ring: oklch(0.62 0.14 var(--song-h));
-  --song-soft: oklch(0.96 0.03 var(--song-h));
-  --song-deep: oklch(0.32 0.09 var(--song-h));
+  --primary: var(--g-primary, oklch(0.52 0.16 var(--song-h)));
+  --primary-foreground: var(--g-fg, oklch(0.985 0 0));
+  --ring: var(--g-ring, oklch(0.62 0.14 var(--song-h)));
+  --song-soft: var(--g-soft, oklch(0.96 0.03 var(--song-h)));
+  --song-deep: var(--g-deep, oklch(0.32 0.09 var(--song-h)));
 }
+/* 회색 테마일 때는 --g-* 값이 style 로 들어와서 위 색 대신 쓰여요 */
 .dark .song-theme {
-  --primary: oklch(0.76 0.13 var(--song-h));
-  --primary-foreground: oklch(0.18 0.03 var(--song-h));
-  --ring: oklch(0.66 0.12 var(--song-h));
-  --song-soft: oklch(0.26 0.04 var(--song-h));
-  --song-deep: oklch(0.2 0.05 var(--song-h));
+  --primary: var(--g-primary-dark, oklch(0.76 0.13 var(--song-h)));
+  --primary-foreground: var(--g-fg-dark, oklch(0.18 0.03 var(--song-h)));
+  --ring: var(--g-ring-dark, oklch(0.66 0.12 var(--song-h)));
+  --song-soft: var(--g-soft-dark, oklch(0.26 0.04 var(--song-h)));
+  --song-deep: var(--g-deep-dark, oklch(0.2 0.05 var(--song-h)));
 }
 
 /* ── 채점 도장 ───────────────────────────────

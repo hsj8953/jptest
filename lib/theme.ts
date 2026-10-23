@@ -1,20 +1,24 @@
 'use client'
 
 // 곡별 색 테마: 유튜브 썸네일의 대표 색(색상 각도 hue)을 뽑아 포인트 색으로 써요.
-// 썸네일을 못 읽거나 색이 너무 무채색이면 곡 ID로 정한 색을 써요.
+// 흑백·회색 위주 썸네일이면 썸네일 밝기에 맞춘 회색 테마를 써요.
+// 썸네일이 없거나 못 읽으면 곡 ID로 정한 색을 써요.
 
 import { useEffect, useState } from 'react'
 import type { Song } from './types'
 
-// v2: OKLCH 기준으로 다시 계산 (v1은 HSL 각도를 그대로 써서 색이 어긋났어요)
-const KEY = 'kakitori.hue.v2'
-const memory = new Map<string, number>()
+/** 색조(0~360) 또는 회색 테마({ g: 썸네일 밝기 0~1 }) */
+export type SongTheme = number | { g: number }
+
+// v3: 흑백 썸네일은 회색 테마 (v2까지는 곡 ID 색으로 대체했어요)
+const KEY = 'kakitori.hue.v3'
+const memory = new Map<string, SongTheme>()
 
 function loadCache() {
   if (memory.size) return
   try {
     const raw = window.localStorage.getItem(KEY)
-    if (raw) Object.entries(JSON.parse(raw) as Record<string, number>).forEach(([k, v]) => memory.set(k, v))
+    if (raw) Object.entries(JSON.parse(raw) as Record<string, SongTheme>).forEach(([k, v]) => memory.set(k, v))
   } catch {
     /* 무시 */
   }
@@ -55,7 +59,7 @@ function rgbToOklch(r8: number, g8: number, b8: number) {
 }
 
 /** 썸네일에서 가장 많이 쓰인 선명한 색의 hue. 못 뽑으면 null */
-function extractHue(youtubeId: string): Promise<number | null> {
+function extractHue(youtubeId: string): Promise<SongTheme | null> {
   return new Promise((resolve) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -74,8 +78,10 @@ function extractHue(youtubeId: string): Promise<number | null> {
         const bins = new Array(24).fill(0)
         const va = new Array(24).fill(0)
         const vb = new Array(24).fill(0)
+        const lights: number[] = []
         for (let i = 0; i < data.length; i += 4) {
           const { L, C, H, A, B } = rgbToOklch(data[i], data[i + 1], data[i + 2])
+          lights.push(L)
           if (C < 0.045 || L < 0.3 || L > 0.92) continue
           const weight = C * (1 - Math.abs(L - 0.62))
           const k = Math.floor(H / 15) % 24
@@ -94,7 +100,12 @@ function extractHue(youtubeId: string): Promise<number | null> {
             best = k
           }
         }
-        if (best < 0 || bins[best] < 1.5) return resolve(null)
+        if (best < 0 || bins[best] < 1.5) {
+          // 색조가 거의 없는 썸네일 → 밝기 중간값으로 회색 테마
+          lights.sort((a, b) => a - b)
+          const mid = lights[Math.floor(lights.length / 2)] ?? 0.5
+          return resolve({ g: Math.round(mid * 100) / 100 })
+        }
         const ks = [(best + 23) % 24, best, (best + 1) % 24]
         const sa = ks.reduce((n, k) => n + va[k], 0)
         const sb = ks.reduce((n, k) => n + vb[k], 0)
@@ -108,35 +119,58 @@ function extractHue(youtubeId: string): Promise<number | null> {
   })
 }
 
-/** 곡의 테마 색상 각도(0~360) */
+/** 곡의 테마 (색조 또는 회색) */
 export function useSongHue(song: Pick<Song, 'id' | 'youtubeId'> | null | undefined) {
   const key = song ? `${song.id}:${song.youtubeId ?? ''}` : ''
-  const [hue, setHue] = useState<number>(() => (song ? fallbackHue(song.id) : 250))
+  const [theme, setTheme] = useState<SongTheme>(() => (song ? fallbackHue(song.id) : 250))
 
   useEffect(() => {
     if (!song) return
     loadCache()
     const cached = memory.get(key)
     if (cached != null) {
-      setHue(cached)
+      setTheme(cached)
       return
     }
-    setHue(fallbackHue(song.id))
+    setTheme(fallbackHue(song.id))
     if (!song.youtubeId) return
     let alive = true
-    extractHue(song.youtubeId).then((h) => {
-      const value = h ?? fallbackHue(song.id)
+    extractHue(song.youtubeId).then((t) => {
+      const value = t ?? fallbackHue(song.id)
       memory.set(key, value)
       saveCache()
-      if (alive) setHue(value)
+      if (alive) setTheme(value)
     })
     return () => {
       alive = false
     }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return hue
+  return theme
 }
 
-/** 테마를 적용할 요소에 붙일 style */
-export const themeStyle = (hue: number) => ({ '--song-h': String(hue) }) as React.CSSProperties
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+
+/** 테마를 적용할 요소에 붙일 style (song-theme 클래스와 같이 써요) */
+export function themeStyle(theme: SongTheme): React.CSSProperties {
+  if (typeof theme === 'number') return { '--song-h': String(theme) } as React.CSSProperties
+  // 회색 테마: 썸네일 밝기를 따르되, 배경에 묻히지 않을 범위로 제한
+  // 라이트 모드(흰 배경)는 너무 밝지 않게, 다크 모드(검은 배경)는 너무 어둡지 않게
+  const light = clamp(theme.g, 0.35, 0.58)
+  const dark = clamp(theme.g, 0.5, 0.88)
+  // 버튼이 밝으면 검은 글씨, 어두우면 흰 글씨
+  const fg = (l: number) => (l > 0.62 ? 'oklch(0.18 0 0)' : 'oklch(0.985 0 0)')
+  return {
+    '--song-h': '0',
+    '--g-primary': `oklch(${light} 0 0)`,
+    '--g-fg': fg(light),
+    '--g-ring': `oklch(${Math.min(light + 0.1, 0.7)} 0 0)`,
+    '--g-soft': 'oklch(0.95 0 0)',
+    '--g-deep': `oklch(${clamp(theme.g * 0.4, 0.22, 0.32)} 0 0)`,
+    '--g-primary-dark': `oklch(${dark} 0 0)`,
+    '--g-fg-dark': fg(dark),
+    '--g-ring-dark': `oklch(${Math.max(dark - 0.1, 0.45)} 0 0)`,
+    '--g-soft-dark': 'oklch(0.27 0 0)',
+    '--g-deep-dark': 'oklch(0.2 0 0)',
+  } as React.CSSProperties
+}

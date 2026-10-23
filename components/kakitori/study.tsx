@@ -36,7 +36,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const koRef = useRef<HTMLInputElement>(null)
   const [needKo, setNeedKo] = useState(false)
   const yt = useYouTube(song.youtubeId)
-  const hue = useSongHue(song)
+  const theme = useSongHue(song)
 
   useEffect(() => watchScores(song.id, setScores), [song.id])
 
@@ -139,7 +139,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   }
 
   return (
-    <main className="study-page song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(hue)}>
+    <main className="study-page song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(theme)}>
       <BackButton onClick={onBack} />
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="min-w-0">

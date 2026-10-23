@@ -19,14 +19,14 @@ function timeAgo(ms: number) {
 
 /** 마지막으로 공부한 곡을 크게 보여주고 바로 이어서 풀게 해요 */
 export function ContinueBanner({ song, progress, touchedAt, onContinue }: { song: Song; progress: SongProgress; touchedAt: number; onContinue: () => void }) {
-  const hue = useSongHue(song)
+  const theme = useSongHue(song)
   const total = song.lines.length
   const ok = song.lines.filter((_, i) => progress[i]?.ok).length
   const next = song.lines.findIndex((_, i) => !progress[i]?.ok)
   const thumb = song.youtubeId ? `https://i.ytimg.com/vi/${song.youtubeId}/hqdefault.jpg` : null
 
   return (
-    <section className="song-theme relative mb-8 overflow-hidden rounded-3xl border border-border bg-[var(--song-deep)] text-white shadow-lg" style={themeStyle(hue)}>
+    <section className="song-theme relative mb-8 overflow-hidden rounded-3xl border border-border bg-[var(--song-deep)] text-white shadow-lg" style={themeStyle(theme)}>
       {thumb && (
         <img src={thumb} alt="" aria-hidden className="absolute inset-0 size-full scale-110 object-cover opacity-45 blur-2xl" />
       )}
