@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react'
 import type { Song } from './types'
 
-const KEY = 'kakitori.hue.v1'
+// v2: OKLCH 기준으로 다시 계산 (v1은 HSL 각도를 그대로 써서 색이 어긋났어요)
+const KEY = 'kakitori.hue.v2'
 const memory = new Map<string, number>()
 
 function loadCache() {
@@ -33,21 +34,24 @@ export function fallbackHue(seed: string) {
   return h % 360
 }
 
-function rgbToHsl(r: number, g: number, b: number) {
-  r /= 255
-  g /= 255
-  b /= 255
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const l = (max + min) / 2
-  const d = max - min
-  if (d === 0) return { h: 0, s: 0, l }
-  const s = d / (1 - Math.abs(2 * l - 1))
-  let h = 0
-  if (max === r) h = ((g - b) / d) % 6
-  else if (max === g) h = (b - r) / d + 2
-  else h = (r - g) / d + 4
-  return { h: (h * 60 + 360) % 360, s, l }
+// sRGB(0~255) → OKLCH. 화면 테마도 OKLCH를 쓰니까 같은 기준으로 색조를 구해요.
+function srgbToLinear(c: number) {
+  c /= 255
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+}
+function rgbToOklch(r8: number, g8: number, b8: number) {
+  const r = srgbToLinear(r8)
+  const g = srgbToLinear(g8)
+  const b = srgbToLinear(b8)
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s
+  const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+  const C = Math.hypot(A, B)
+  const H = ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360
+  return { L, C, H, A, B }
 }
 
 /** 썸네일에서 가장 많이 쓰인 선명한 색의 hue. 못 뽑으면 null */
@@ -66,21 +70,35 @@ function extractHue(youtubeId: string): Promise<number | null> {
         if (!ctx) return resolve(null)
         ctx.drawImage(img, 0, 0, w, h)
         const data = ctx.getImageData(0, 0, w, h).data
-        // 색상환을 24칸으로 나눠, 선명하고 너무 어둡거나 밝지 않은 픽셀에 가중치를 줘요
+        // OKLCH 색상환을 24칸으로 나눠, 선명하고 너무 어둡거나 밝지 않은 픽셀에 가중치를 줘요
         const bins = new Array(24).fill(0)
-        const sums = new Array(24).fill(0)
+        const va = new Array(24).fill(0)
+        const vb = new Array(24).fill(0)
         for (let i = 0; i < data.length; i += 4) {
-          const { h: hue, s, l } = rgbToHsl(data[i], data[i + 1], data[i + 2])
-          if (s < 0.25 || l < 0.15 || l > 0.85) continue
-          const weight = s * (1 - Math.abs(l - 0.5))
-          const b = Math.floor(hue / 15) % 24
-          bins[b] += weight
-          sums[b] += hue * weight
+          const { L, C, H, A, B } = rgbToOklch(data[i], data[i + 1], data[i + 2])
+          if (C < 0.045 || L < 0.3 || L > 0.92) continue
+          const weight = C * (1 - Math.abs(L - 0.62))
+          const k = Math.floor(H / 15) % 24
+          bins[k] += weight
+          // 각도 평균은 벡터로 더해서 구해요 (359도와 1도가 섞여도 안전)
+          va[k] += (A / C) * weight
+          vb[k] += (B / C) * weight
         }
+        // 이웃 칸까지 묶어서 가장 큰 색 덩어리를 골라요
         let best = -1
-        for (let b = 0; b < 24; b++) if (best < 0 || bins[b] > bins[best]) best = b
-        if (best < 0 || bins[best] < 8) return resolve(null)
-        resolve(Math.round(sums[best] / bins[best]))
+        let bestScore = 0
+        for (let k = 0; k < 24; k++) {
+          const score = bins[k] + 0.5 * (bins[(k + 23) % 24] + bins[(k + 1) % 24])
+          if (score > bestScore) {
+            bestScore = score
+            best = k
+          }
+        }
+        if (best < 0 || bins[best] < 1.5) return resolve(null)
+        const ks = [(best + 23) % 24, best, (best + 1) % 24]
+        const sa = ks.reduce((n, k) => n + va[k], 0)
+        const sb = ks.reduce((n, k) => n + vb[k], 0)
+        resolve(Math.round(((Math.atan2(sb, sa) * 180) / Math.PI + 360) % 360))
       } catch {
         resolve(null) // 이미지가 교차 출처라 읽을 수 없는 경우
       }
