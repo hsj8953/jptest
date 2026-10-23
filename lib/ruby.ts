@@ -26,3 +26,24 @@ export function parseRuby(s: string): RubyPart[] {
   if (buf) out.push({ text: buf })
   return out
 }
+
+export type Segment = { text: string; reading?: string; kanji: boolean }
+
+/** 문장을 한자 덩어리 / 그 외 덩어리로 나눠요. 한자 덩어리에는 읽기가 붙어 있을 수 있어요. */
+export function splitRuby(s: string): Segment[] {
+  const out: Segment[] = []
+  for (const p of parseRuby(s)) {
+    if (p.reading) {
+      out.push({ text: p.text, reading: p.reading, kanji: true })
+      continue
+    }
+    const runs = p.text.match(/[㐀-䶿一-鿿豈-﫿々〆ヶ]+|[^㐀-䶿一-鿿豈-﫿々〆ヶ]+/g) ?? []
+    for (const r of runs) out.push({ text: r, kanji: KANJI.test(r) })
+  }
+  return out
+}
+
+/** splitRuby 결과를 다시 漢字{かんじ} 표기로 합쳐요 */
+export function joinRuby(segs: Segment[]) {
+  return segs.map((g) => (g.kanji && g.reading ? `${g.text}{${g.reading}}` : g.text)).join('')
+}

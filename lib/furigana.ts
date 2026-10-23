@@ -68,3 +68,68 @@ export async function addFurigana(line: string) {
     .join('')
   return baseText(out) === base ? out : base
 }
+
+import { getFirebaseAuth } from './firebase'
+import { splitRuby } from './ruby'
+
+export type FuriResult = { ruby: string; check: string[] }
+
+/** 한자 덩어리 → 읽기 (등장 순서대로) */
+function readingsOf(ruby: string) {
+  return splitRuby(ruby).filter((g) => g.kanji).map((g) => ({ text: g.text, reading: g.reading ?? '' }))
+}
+
+/**
+ * AI로 읽기를 만들고, 사전(kuromoji) 결과와 비교해서 서로 다르거나 AI가 확신 없는 단어를 표시해요.
+ * AI를 못 쓰면 사전 결과만 돌려주고 aiUsed=false.
+ */
+export async function generateFurigana(lines: string[], onProgress?: (done: number, total: number) => void): Promise<{ results: FuriResult[]; aiUsed: boolean; aiError?: string }> {
+  const dict: string[] = []
+  for (const l of lines) dict.push(KANJI.test(baseText(l)) ? await addFurigana(l) : baseText(l))
+
+  let ai: ({ ruby: string; unsure: string[] } | null)[] = lines.map(() => null)
+  let aiUsed = false
+  let aiError: string | undefined
+  try {
+    const token = await getFirebaseAuth().currentUser?.getIdToken()
+    if (!token) throw new Error('unauthorized')
+    const CHUNK = 60
+    for (let i = 0; i < lines.length; i += CHUNK) {
+      onProgress?.(i, lines.length)
+      const res = await fetch('/api/furigana', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ lines: lines.slice(i, i + CHUNK).map(baseText) }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { lines?: ({ ruby: string; unsure: string[] } | null)[]; error?: string }
+      if (!res.ok || !json.lines) throw new Error(json.error ?? 'ai_failed')
+      json.lines.forEach((r, j) => (ai[i + j] = r))
+    }
+    aiUsed = true
+  } catch (e) {
+    aiError = (e as Error).message
+    ai = lines.map(() => null)
+  }
+
+  const results = lines.map((src, i) => {
+    const d = dict[i]
+    const a = ai[i]
+    if (!KANJI.test(baseText(src))) return { ruby: baseText(src), check: [] }
+    if (!a) return { ruby: d, check: aiUsed ? readingsOf(d).map((r) => r.text) : [] }
+    const check = new Set(a.unsure)
+    // 사전과 AI의 읽기가 다른 한자 덩어리는 확인 필요
+    const ar = readingsOf(a.ruby)
+    const dr = readingsOf(d)
+    if (ar.length === dr.length) {
+      ar.forEach((r, k) => {
+        if (r.text === dr[k].text && r.reading !== dr[k].reading) check.add(r.text)
+      })
+    }
+    ar.forEach((r) => {
+      if (!r.reading) check.add(r.text)
+    })
+    return { ruby: a.ruby, check: [...check] }
+  })
+  onProgress?.(lines.length, lines.length)
+  return { results, aiUsed, aiError }
+}

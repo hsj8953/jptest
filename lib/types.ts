@@ -4,6 +4,8 @@ export type Line = {
   ko: string
   /** 문장 시작 시간(초). 아직 안 찍었으면 null */
   start: number | null
+  /** 읽기를 다시 확인해야 하는 한자 단어들 (관리자 화면에서만 노랗게 표시) */
+  check?: string[]
 }
 
 export type Song = {

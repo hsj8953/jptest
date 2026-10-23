@@ -17,6 +17,13 @@ npm run dev     # http://localhost:3000
 4. `firestore.rules` 의 `ADMIN_EMAIL_HERE` 를 관리자 이메일로 바꾼 뒤, 콘솔의 **Firestore → 규칙** 탭에 통째로 붙여넣고 **게시**해요.
 5. `npm run dev` 로 실행해서 관리자 이메일로 로그인해요.
 
+## AI 한자 읽기 (Gemini)
+
+- [Google AI Studio](https://aistudio.google.com/apikey)에서 API 키를 만들고 `GEMINI_API_KEY` 로 넣어요. (`.env.local`, Netlify 환경 변수 둘 다)
+- 곡 등록 화면의 **AI로 한자 읽기 만들기**는 AI 결과와 사전(kuromoji) 결과를 비교해서, 서로 다르거나 AI가 확신 없는 단어를 노랗게 표시해요.
+- 한자를 누르면 읽기를 고칠 수 있고, 타이밍 화면에서도 노래를 들으며 고칠 수 있어요.
+- 키가 없으면 사전으로만 만들어요.
+
 ## 누가 무엇을 할 수 있나
 
 - **관리자** (`NEXT_PUBLIC_ADMIN_EMAIL`): 곡 등록 · 편집 · 타이밍 · 삭제, 친구 초대
@@ -45,7 +52,7 @@ lib/
   firebase.ts                 Firebase 연결
   store.ts                    Firestore 읽기/쓰기 · 실시간 동기화
   youtube.ts                  유튜브 플레이어 · 구간 재생
-  furigana.ts                 한자 읽기 자동 생성 (kuromoji)
+  furigana.ts                 한자 읽기 생성 (AI + kuromoji 비교)
   ruby.ts                     漢字{かんじ} 표기 처리
   diff.ts                     글자 단위 비교
 scripts/copy-kuromoji.mjs     사전 복사 스크립트

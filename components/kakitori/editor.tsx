@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { ChevronRight, Copy, Loader2, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, newSongId } from '@/lib/store'
-import { addFurigana } from '@/lib/furigana'
+import { generateFurigana } from '@/lib/furigana'
+import { RubyEditable } from './ruby-edit'
 import { KANJI, baseText } from '@/lib/ruby'
 import { parseYouTubeId } from '@/lib/youtube'
 import type { Line, Song } from '@/lib/types'
@@ -40,20 +41,18 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
   const autoFurigana = async () => {
     if (!rows) return
     setBusy(true)
-    setFuriMsg('사전 불러오는 중… (처음 한 번은 몇 초 걸려요)')
+    setFuriMsg('읽기를 만드는 중… (처음 한 번은 사전을 불러오느라 몇 초 걸려요)')
     try {
-      let n = 0
-      const next: Line[] = []
-      for (const l of rows) {
-        if (KANJI.test(baseText(l.ruby))) {
-          next.push({ ...l, ruby: await addFurigana(l.ruby) })
-          n++
-        } else next.push(l)
-      }
-      setRows(next)
-      setFuriMsg(`${n}문장에 읽기를 넣었어요. 틀린 읽기는 칸에서 직접 고쳐 주세요.`)
+      const { results, aiUsed, aiError } = await generateFurigana(
+        rows.map((l) => l.ruby),
+        (done, total) => setFuriMsg(`AI가 읽기를 만드는 중… ${done} / ${total}`),
+      )
+      setRows(rows.map((l, i) => ({ ...l, ruby: results[i].ruby, check: results[i].check })))
+      const flagged = results.reduce((n, r) => n + r.check.length, 0)
+      const base = aiUsed ? 'AI로 읽기를 넣었어요.' : `AI를 쓸 수 없어서(${aiErrorText(aiError)}) 사전으로만 넣었어요.`
+      setFuriMsg(flagged ? `${base} 노란 단어 ${flagged}개는 노래를 들으며 확인해 주세요.` : base)
     } catch {
-      setFuriMsg('사전을 불러오지 못했어요. 漢字{かんじ} 형식으로 직접 적어 주세요.')
+      setFuriMsg('읽기를 만들지 못했어요. 漢字{かんじ} 형식으로 직접 적어 주세요.')
     } finally {
       setBusy(false)
     }
@@ -61,7 +60,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
 
   const save = async () => {
     const youtubeId = yt.trim() ? parseYouTubeId(yt) : null
-    const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: l.ruby.trim(), ko: l.ko.trim(), start: l.start ?? null }))
+    const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: l.ruby.trim(), ko: l.ko.trim(), start: l.start ?? null, ...(l.check?.length ? { check: l.check } : {}) }))
     if (!title.trim()) return setError('곡 제목을 적어 주세요.')
     if (ytInvalid) return setError('유튜브 링크 형식을 확인해 주세요.')
     if (!lines.length) return setError('가사를 붙여넣고 ‘문장 나누기’를 눌러 주세요.')
@@ -117,11 +116,11 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <h2 className="text-sm font-semibold">문장 확인 <span className="font-normal text-muted-foreground">· 일본어 {rowJp} / 한국어 {rowKo}</span></h2>
             <button onClick={autoFurigana} disabled={busy || !rows.length} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Settings2 className="size-4" />}한자 읽기 자동 생성
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Settings2 className="size-4" />}AI로 한자 읽기 만들기
             </button>
             {furiMsg && <span className="text-xs text-muted-foreground">{furiMsg}</span>}
           </div>
-          <p className="mb-4 text-xs text-muted-foreground">읽기는 漢字&#123;かんじ&#125; 형식으로 고칠 수 있어요. 채점할 때는 중괄호 부분을 빼고 비교해요.</p>
+          <p className="mb-4 text-xs leading-5 text-muted-foreground">한자를 누르면 읽기를 고칠 수 있어요. <span className="rounded bg-amber-200/70 px-1 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200">노란 단어</span>는 AI와 사전의 읽기가 다르거나 AI가 확신하지 못한 단어예요. 타이밍 화면에서 노래를 들으며 확인할 수도 있어요.</p>
           <div className="flex flex-col gap-3">
             {rows.map((row, i) => {
               const bad = !row.ruby.trim() || !row.ko.trim()
@@ -129,7 +128,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
                 <div key={i} className={`rounded-xl border p-4 ${bad ? 'border-destructive bg-destructive/5' : 'border-border bg-card'}`}>
                   <div className="mb-3 flex items-center gap-3">
                     <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
-                    <span className="min-w-0 font-jp text-base leading-loose">{row.ruby ? <Furigana text={row.ruby} /> : <span className="text-sm text-destructive">일본어 없음</span>}</span>
+                    <span className="min-w-0 text-lg">{row.ruby ? <RubyEditable value={row.ruby} check={row.check} onChange={(ruby, check) => setRows((r) => r?.map((l, j) => (j === i ? { ...l, ruby, check } : l)) ?? r)} /> : <span className="text-sm text-destructive">일본어 없음</span>}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <input id={`row-jp-${i}`} lang="ja" value={row.ruby} onChange={(e) => edit(i, 'ruby', e.target.value)} aria-label={`${i + 1}번 일본어`} className="min-w-0 rounded-lg border border-input bg-background px-3 py-2 font-jp" />
@@ -149,4 +148,11 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
       </div>
     </main>
   )
+}
+
+function aiErrorText(code?: string) {
+  if (code === 'no_key') return 'API 키가 설정되지 않음'
+  if (code === 'rate_limited') return '무료 사용량 초과, 잠시 후 다시'
+  if (code === 'forbidden' || code === 'unauthorized') return '관리자 확인 실패'
+  return '연결 오류'
 }

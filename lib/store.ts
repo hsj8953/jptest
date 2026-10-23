@@ -135,6 +135,8 @@ export const newSongId = () => Date.now().toString(36) + Math.random().toString(
 export const actions = {
   async saveSong(song: Song) {
     const { id, ...body } = song
+    // 확인이 끝난 줄은 check 필드를 지워서 저장
+    body.lines = body.lines.map(({ check, ...l }) => (check?.length ? { ...l, check } : l))
     await setDoc(doc(getDb(), 'songs', id), body)
   },
   async deleteSong(id: string) {

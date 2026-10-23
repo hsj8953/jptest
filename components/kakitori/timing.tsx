@@ -8,6 +8,7 @@ import { baseText } from '@/lib/ruby'
 import { fmtTime, useYouTube } from '@/lib/youtube'
 import type { Line, Song } from '@/lib/types'
 import { BackButton } from './furigana'
+import { RubyEditable } from './ruby-edit'
 
 export function Timing({ song, onBack, onStudy, onEdit }: { song: Song; onBack: () => void; onStudy: (id: string) => void; onEdit: (id: string) => void }) {
   const [lines, setLines] = useState<Line[]>(song.lines)
@@ -104,11 +105,23 @@ export function Timing({ song, onBack, onStudy, onEdit }: { song: Song; onBack: 
       </button>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
-        <div className="border-b border-border px-4 py-3 text-sm font-semibold">문장 시작 시간</div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-4 py-3">
+          <span className="text-sm font-semibold">문장 시작 시간 · 한자 읽기</span>
+          {(() => {
+            const n = lines.reduce((c, l) => c + (l.check?.length ?? 0), 0)
+            return n ? (
+              <span className="text-xs text-amber-700 dark:text-amber-300">노란 단어 {n}개 · ▶로 들어보고 한자를 눌러 고치거나 확인해 주세요</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">한자를 누르면 읽기를 고칠 수 있어요</span>
+            )
+          })()}
+        </div>
         {lines.map((s, i) => (
           <div key={i} className={`flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0 ${i === active ? 'bg-primary/5' : ''}`}>
             <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold">{i + 1}</span>
-            <span className="min-w-0 flex-1 basis-48 font-jp text-sm">{baseText(s.ruby)}</span>
+            <span className="min-w-0 flex-1 basis-48 text-base">
+              <RubyEditable value={s.ruby} check={s.check} onChange={(ruby, check) => { setLines((L) => L.map((l, j) => (j === i ? { ...l, ruby, check } : l))); setMsg('') }} />
+            </span>
             <span className="w-16 text-right font-mono text-sm tabular-nums text-primary">{s.start == null ? '—' : `${s.start.toFixed(1)}s`}</span>
             <div className="flex gap-1">
               <button onClick={() => nudge(i, -0.2)} disabled={s.start == null} className="rounded border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40" aria-label={`${i + 1}번 0.2초 앞당기기`}>−0.2</button>
