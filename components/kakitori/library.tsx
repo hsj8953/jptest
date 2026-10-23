@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { actions, countCorrect, useStore } from '@/lib/store'
 import type { Song } from '@/lib/types'
 import { ProgressBar } from './furigana'
+import { ContinueBanner } from './continue-banner'
+import { ThemedCard } from './themed'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
@@ -17,11 +19,15 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
   onInvite: () => void
   onNew: () => void
 }) {
-  const { songs, progress, ready, error } = useStore()
+  const { songs, progress, touched, ready, error } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
   const solved = songs.reduce((n, s) => n + countCorrect(progress[s.id], s.lines.length), 0)
+  // 가장 최근에 공부한 곡 (타이밍이 있어서 풀 수 있는 곡만)
+  const recent = songs
+    .filter((s) => touched[s.id] && (isTimed(s) || isAdmin))
+    .sort((a, b) => (touched[b.id] ?? 0) - (touched[a.id] ?? 0))[0]
   const finished = songs.filter((s) => s.lines.length > 0 && countCorrect(progress[s.id], s.lines.length) === s.lines.length).length
 
   return (
@@ -39,6 +45,10 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
           </div>
         )}
       </div>
+
+      {recent && (
+        <ContinueBanner song={recent} progress={progress[recent.id] ?? {}} touchedAt={touched[recent.id]} onContinue={() => onSelect(recent.id)} />
+      )}
 
       <div className="mb-8 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3">
         <Stat label="전체 곡" value={songs.length} />
@@ -63,7 +73,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
           const pct = n ? Math.round((ok / n) * 100) : 0
           const timed = isTimed(song)
           return (
-            <article key={song.id} className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+            <ThemedCard key={song.id} song={song} className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
               <button
                 type="button"
                 onClick={() => (timed || isAdmin) && onSelect(song.id)}
@@ -138,7 +148,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
                   </span>
                 </div>
               )}
-            </article>
+            </ThemedCard>
           )
         })}
       </div>

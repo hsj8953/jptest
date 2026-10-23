@@ -15,11 +15,13 @@ type State = {
   ready: boolean
   songs: Song[]
   progress: Record<string, SongProgress>
+  /** 곡별 마지막으로 공부한 시각 (ms) — 이어서 하기에 써요 */
+  touched: Record<string, number>
   invites: string[]
   error: string | null
 }
 
-const empty: State = { ready: false, songs: [], progress: {}, invites: [], error: null }
+const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], error: null }
 let state: State = empty
 let me: User | null = null
 let unsubs: (() => void)[] = []
@@ -69,10 +71,13 @@ export function startSync(user: User) {
       collection(db, 'users', user.uid, 'progress'),
       (snap) => {
         const progress: Record<string, SongProgress> = {}
+        const touched: Record<string, number> = {}
         snap.docs.forEach((d) => {
-          progress[d.id] = (d.data().lines ?? {}) as SongProgress
+          const data = d.data()
+          progress[d.id] = (data.lines ?? {}) as SongProgress
+          touched[d.id] = Number(data.touchedAt ?? data.updatedAt?.toMillis?.() ?? 0)
         })
-        set({ progress })
+        set({ progress, touched })
         progIn = true
         markReady()
       },
@@ -143,8 +148,9 @@ export const actions = {
     const db = getDb()
     const total = state.songs.find((s) => s.id === songId)?.lines.length ?? 0
     // 화면이 바로 바뀌도록 먼저 반영
-    set({ progress: { ...state.progress, [songId]: p } })
-    await setDoc(doc(db, 'users', me.uid, 'progress', songId), { lines: p, updatedAt: serverTimestamp() })
+    const now = Date.now()
+    set({ progress: { ...state.progress, [songId]: p }, touched: { ...state.touched, [songId]: now } })
+    await setDoc(doc(db, 'users', me.uid, 'progress', songId), { lines: p, touchedAt: now, updatedAt: serverTimestamp() })
     await setDoc(doc(db, 'songs', songId, 'scores', me.uid), { name: me.name, ok: countCorrect(p, total), total, updatedAt: serverTimestamp() })
   },
   async setInvites(emails: string[]) {

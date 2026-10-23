@@ -7,6 +7,7 @@ import { baseText, parseRuby } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import type { Song, SongProgress } from '@/lib/types'
 import { ProgressBar } from './furigana'
+import { themeStyle, useSongHue } from '@/lib/theme'
 
 type Row = {
   index: number
@@ -33,6 +34,7 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
   onRestart: () => void
 }) {
   const [onlyWrong, setOnlyWrong] = useState(false)
+  const hue = useSongHue(song)
   const [confirmRestart, setConfirmRestart] = useState(false)
 
   const rows = useMemo<Row[]>(() =>
@@ -58,7 +60,7 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
   const shown = onlyWrong ? rows.filter((r) => !r.ok) : rows
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+    <main className="song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(hue)}>
       <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" />곡 목록
       </button>

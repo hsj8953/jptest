@@ -9,6 +9,7 @@ import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
 import type { Song, User } from '@/lib/types'
 import { BackButton, Furigana, ProgressBar } from './furigana'
+import { themeStyle, useSongHue } from '@/lib/theme'
 import { Results } from './results'
 
 type Result = { ok: boolean; input: string; revealed: boolean }
@@ -35,6 +36,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const koRef = useRef<HTMLInputElement>(null)
   const [needKo, setNeedKo] = useState(false)
   const yt = useYouTube(song.youtubeId)
+  const hue = useSongHue(song)
 
   useEffect(() => watchScores(song.id, setScores), [song.id])
 
@@ -137,7 +139,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   }
 
   return (
-    <main className="study-page mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+    <main className="study-page song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(hue)}>
       <BackButton onClick={onBack} />
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="min-w-0">
@@ -184,6 +186,12 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
               <label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기 <span className="font-normal text-destructive">*</span></label>
               {result && !result.revealed && <span className={result.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{result.ok ? '〇 정답' : '✕ 오답'}</span>}
             </div>
+            <div className={`relative ${result && !result.revealed && !result.ok ? 'stamp-shake' : ''}`} key={`wrap-${current}-${p.tries ?? 0}`}>
+            {result && !result.revealed && (
+              <span className={`hanko ${result.ok ? 'hanko-ok' : 'hanko-no'}`} role="img" aria-label={result.ok ? '정답 도장' : '오답 도장'}>
+                {result.ok ? '〇' : '✕'}
+              </span>
+            )}
             <textarea
               id="jp-answer"
               ref={answerRef}
@@ -198,8 +206,9 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
               }}
               disabled={!!result}
               placeholder="들은 문장을 일본어로 적어 보세요"
-              className="jp-writing min-h-28 w-full resize-none rounded-xl border-2 border-dashed border-border bg-background p-4 text-lg outline-none focus:border-primary disabled:opacity-80"
+              className="jp-writing min-h-28 w-full resize-none rounded-xl border-2 border-dashed border-border bg-background p-4 pr-28 text-lg outline-none focus:border-primary disabled:opacity-80"
             />
+            </div>
             <label htmlFor="ko-answer" className="mt-5 block text-sm font-semibold">한국어 해석 <span className="font-normal text-destructive">*</span></label>
             <input
               id="ko-answer"
