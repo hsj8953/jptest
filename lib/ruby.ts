@@ -58,7 +58,17 @@ export function normalizeKanji(s: string) {
   return String(s ?? '').replace(LOOKALIKE, (c) => c.normalize('NFKC'))
 }
 
-/** 채점용 정답 문장 (읽기 표기 제거 + 한자 정리 + 앞뒤 공백 제거) */
+/** 전각 숫자·알파벳(１２３ ＡＢＣ ａｂｃ)을 반각(123 ABC abc)으로 바꿔요. 가나·기호·띄어쓰기는 그대로예요. */
+export function normalizeWidth(s: string) {
+  return String(s ?? '').replace(/[\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+}
+
+/** 채점할 때 쓰는 정리: 부수·호환 한자 → 일반 한자, 전각 숫자·알파벳 → 반각, 앞뒤 공백 제거 */
+export function normalizeAnswer(s: string) {
+  return normalizeWidth(normalizeKanji(s)).trim()
+}
+
+/** 채점용 정답 문장 (읽기 표기 제거 + 정리) */
 export function answerOf(ruby: string) {
-  return normalizeKanji(baseText(ruby)).trim()
+  return normalizeAnswer(baseText(ruby))
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Trophy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrect, useStore, watchScores, type Score } from '@/lib/store'
-import { answerOf, normalizeKanji } from '@/lib/ruby'
+import { answerOf, normalizeAnswer, normalizeKanji } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
 import type { Song, User } from '@/lib/types'
@@ -115,7 +115,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   }
 
   const submit = () => {
-    const input = normalizeKanji(answer).trim()
+    const input = normalizeAnswer(answer)
     if (!input) {
       answerRef.current?.focus()
       return
@@ -131,7 +131,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   }
   const reveal = () => {
     save({ ...prog, [current]: { ...p, revealed: true, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation } })
-    setResult({ ok: false, input: normalizeKanji(answer).trim(), revealed: true })
+    setResult({ ok: false, input: normalizeAnswer(answer), revealed: true })
   }
   const retry = () => {
     setResult(null)

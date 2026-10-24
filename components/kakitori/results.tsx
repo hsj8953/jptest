@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Eye, RotateCcw, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { answerOf, normalizeKanji, parseRuby } from '@/lib/ruby'
+import { answerOf, normalizeAnswer, normalizeKanji, parseRuby } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import type { Song, SongProgress } from '@/lib/types'
 import { ProgressBar } from './furigana'
@@ -41,7 +41,7 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
     song.lines.map((l, index) => {
       const p = progress[index] ?? {}
       const base = answerOf(l.ruby)
-      const answer = normalizeKanji(p.answer ?? '').trim()
+      const answer = normalizeAnswer(p.answer ?? '')
       const { ans, inp } = diffChars(base, answer)
       const matched = ans.filter((c) => !c.bad).length
       const denom = Math.max(Array.from(base).length, Array.from(answer).length)
