@@ -70,6 +70,7 @@ export async function addFurigana(line: string) {
 }
 
 import { getFirebaseAuth } from './firebase'
+import { postAi, type AiError } from './ai-client'
 import { splitRuby } from './ruby'
 
 export type FuriResult = { ruby: string; check: string[] }
@@ -83,7 +84,7 @@ function readingsOf(ruby: string) {
  * AI로 읽기를 만들고, 사전(kuromoji) 결과와 비교해서 서로 다르거나 AI가 확신 없는 단어를 표시해요.
  * AI를 못 쓰면 사전 결과만 돌려주고 aiUsed=false.
  */
-export async function generateFurigana(lines: string[], onProgress?: (done: number, total: number) => void): Promise<{ results: FuriResult[]; aiUsed: boolean; aiError?: string; aiDetail?: string; aiFailed: number }> {
+export async function generateFurigana(lines: string[], onProgress?: (done: number, total: number, note?: string) => void): Promise<{ results: FuriResult[]; aiUsed: boolean; aiError?: string; aiDetail?: string; aiFailed: number }> {
   const dict: string[] = []
   for (const l of lines) dict.push(KANJI.test(baseText(l)) ? await addFurigana(l) : baseText(l))
 
@@ -95,7 +96,7 @@ export async function generateFurigana(lines: string[], onProgress?: (done: numb
   try {
     const token = await getFirebaseAuth().currentUser?.getIdToken()
     if (!token) throw Object.assign(new Error('unauthorized'), { detail: '' })
-    // 6줄씩 작게 나눠 3묶음씩 동시에 보내요. 실패한 묶음이 있어도 성공한 줄은 AI 결과를 써요.
+    // 6줄씩 작게 나눠 보내요. 실패한 묶음이 있어도 성공한 줄은 AI 결과를 써요.
     const CHUNK = 6
     const starts: number[] = []
     for (let i = 0; i < lines.length; i += CHUNK) starts.push(i)
@@ -104,31 +105,22 @@ export async function generateFurigana(lines: string[], onProgress?: (done: numb
     const runOne = async (i: number) => {
       const part = lines.slice(i, i + CHUNK).map(baseText)
       try {
-        const res = await fetch('/api/furigana', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ lines: part }),
-        })
-        const text = await res.text()
-        let json: { lines?: ({ ruby: string; unsure: string[] } | null)[]; error?: string; detail?: string } = {}
-        try {
-          json = JSON.parse(text)
-        } catch {
-          json = { error: res.status === 502 || res.status === 504 ? 'timeout' : 'ai_failed', detail: `서버 응답 ${res.status}` }
-        }
-        if (!res.ok || !json.lines) throw Object.assign(new Error(json.error ?? 'ai_failed'), { detail: json.detail ?? `서버 응답 ${res.status}` })
+        const json = await postAi<{ lines: ({ ruby: string; unsure: string[] } | null)[] }>('/api/furigana', { lines: part }, token, (sec) =>
+          onProgress?.(done, lines.length, `Gemini가 바빠서 ${sec}초 뒤 다시 시도해요…`),
+        )
         json.lines.forEach((r, j) => (ai[i + j] = r))
         aiUsed = true
       } catch (e) {
         aiFailed += part.filter((l) => KANJI.test(l)).length
-        aiError ??= (e as Error).message
-        aiDetail ??= (e as { detail?: string }).detail
+        aiError ??= (e as AiError).code ?? (e as Error).message
+        aiDetail ??= (e as AiError).detail
       } finally {
         done += part.length
         onProgress?.(done, lines.length)
       }
     }
-    for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(runOne))
+    // 무료 한도에 덜 걸리게 하나씩 순서대로 보내요
+    for (const st of starts) await runOne(st)
   } catch (e) {
     aiError = (e as Error).message
     aiDetail = (e as { detail?: string }).detail

@@ -3,6 +3,7 @@
 // 단어장: 곡 가사에서 한자가 들어간 단어를 사전형으로 뽑고, AI로 읽기·뜻을 붙여요.
 import { getTokenizer, toHira } from './furigana'
 import { getFirebaseAuth } from './firebase'
+import { postAi, type AiError } from './ai-client'
 import { KANJI, answerOf } from './ruby'
 import type { Line, SongWord } from './types'
 
@@ -39,14 +40,14 @@ export async function extractWords(lines: Line[]): Promise<SongWord[]> {
 }
 
 /** AI로 읽기와 뜻을 채워요. 실패하면 사전 읽기만 남기고 이유를 알려줘요. */
-export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?: (done: number, total: number) => void) {
+export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?: (done: number, total: number, note?: string) => void) {
   const out = words.map((w) => ({ ...w }))
   let error: string | undefined
   let detail: string | undefined
   try {
     const token = await getFirebaseAuth().currentUser?.getIdToken()
     if (!token) throw Object.assign(new Error('unauthorized'), { detail: '' })
-    // 작게 나눠 3묶음씩 동시에 보내요. 실패한 묶음이 있어도 성공한 단어는 남겨요.
+    // 작게 나눠 보내요. 실패한 묶음이 있어도 성공한 단어는 남겨요.
     const CHUNK = 10
     let done = 0
     let failed = 0
@@ -57,19 +58,12 @@ export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?
     const runOne = async (s: number) => {
       const part = out.slice(s, s + CHUNK)
       try {
-        const res = await fetch('/api/words', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ items: part.map((w) => ({ word: w.word, context: answerOf(lines[w.lines[0]]?.ruby ?? '') })) }),
-        })
-        const text = await res.text()
-        let json: { words?: ({ word: string; reading: string; meaning: string } | null)[]; error?: string; detail?: string } = {}
-        try {
-          json = JSON.parse(text)
-        } catch {
-          json = { error: res.status >= 502 ? 'timeout' : 'ai_failed', detail: `서버 응답 ${res.status}` }
-        }
-        if (!res.ok || !json.words) throw Object.assign(new Error(json.error ?? 'ai_failed'), { detail: json.detail })
+        const json = await postAi<{ words: ({ word: string; reading: string; meaning: string } | null)[] }>(
+          '/api/words',
+          { items: part.map((w) => ({ word: w.word, context: answerOf(lines[w.lines[0]]?.ruby ?? '') })) },
+          token,
+          (sec) => onProgress?.(done, out.length, `Gemini가 바빠서 ${sec}초 뒤 다시 시도해요…`),
+        )
         json.words.forEach((r, j) => {
           if (!r) return
           const w = out[s + j]
@@ -78,13 +72,14 @@ export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?
         })
       } catch (e) {
         failed += part.length
-        firstErr ??= { message: (e as Error).message, detail: (e as { detail?: string }).detail }
+        firstErr ??= { message: (e as AiError).code ?? (e as Error).message, detail: (e as AiError).detail }
       } finally {
         done += part.length
         onProgress?.(done, out.length)
       }
     }
-    for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(runOne))
+    // 무료 한도에 덜 걸리게 하나씩 순서대로 보내요
+    for (const st of starts) await runOne(st)
     if (firstErr) {
       const fe = firstErr as { message: string; detail?: string }
       error = fe.message

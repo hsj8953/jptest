@@ -37,7 +37,7 @@ export function WordEditor({ lines, words, onChange }: { lines: Line[]; words: S
         setMsg(`단어 ${merged.length}개를 찾았어요.`)
         return
       }
-      const r = await fillWordInfo(need, lines, (d, t) => setMsg(`AI가 뜻을 붙이는 중… ${d} / ${t}`))
+      const r = await fillWordInfo(need, lines, (d, t, note) => setMsg(note ?? `AI가 뜻을 붙이는 중… ${d} / ${t}`))
       const filled = new Map(r.words.map((w) => [w.word, w]))
       const result = merged.map((w) => filled.get(w.word) ?? w)
       onChange(result)

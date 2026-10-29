@@ -48,7 +48,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
     try {
       const { results, aiUsed, aiError, aiDetail, aiFailed } = await generateFurigana(
         rows.map((l) => l.ruby),
-        (done, total) => setFuriMsg(`AI가 읽기를 만드는 중… ${done} / ${total}`),
+        (done, total, note) => setFuriMsg(note ?? `AI가 읽기를 만드는 중… ${done} / ${total}`),
       )
       setRows(rows.map((l, i) => ({ ...l, ruby: results[i].ruby, check: results[i].check })))
       const flagged = results.reduce((n, r) => n + r.check.length, 0)
