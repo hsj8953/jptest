@@ -196,7 +196,7 @@ export default function Page() {
   else if (view === 'study' && selected) body = <Study key={`${selected.id}-${line ?? ''}`} song={selected} user={user} initialLine={line} onBack={goLibrary} />
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-paper min-h-screen">
       <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} />
       {body}
     </div>

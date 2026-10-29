@@ -388,3 +388,31 @@
 @media (prefers-reduced-motion: reduce) {
   .listen-pulse { outline: 3px solid color-mix(in oklch, var(--primary) 45%, transparent); outline-offset: 2px; }
 }
+
+/* ── 종이 바탕 (로그인 화면을 뺀 나머지 화면) ─────────
+   아주 연한 미색 + 거의 안 보이는 원고지 칸 + 로그인 화면과 같은 은은한 색 번짐 */
+:root {
+  --paper: oklch(0.985 0.008 85);
+  --paper-grid: oklch(0.45 0.02 85 / 0.045);
+  --paper-glow-a: oklch(0.93 0.05 150 / 0.4);
+  --paper-glow-b: oklch(0.93 0.05 27 / 0.32);
+}
+.dark {
+  --paper: oklch(0.155 0.004 85);
+  --paper-grid: oklch(0.9 0.01 85 / 0.035);
+  --paper-glow-a: oklch(0.32 0.07 150 / 0.35);
+  --paper-glow-b: oklch(0.3 0.08 27 / 0.28);
+}
+.app-paper {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, var(--paper-glow-a), transparent 60%),
+    radial-gradient(50rem 35rem at 110% 110%, var(--paper-glow-b), transparent 60%),
+    linear-gradient(var(--paper-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px);
+  background-size: auto, auto, 24px 24px, 24px 24px;
+  background-attachment: fixed;
+}
+.app-header {
+  background-color: color-mix(in oklch, var(--paper) 88%, transparent);
+}
