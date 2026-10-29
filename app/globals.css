@@ -413,6 +413,3 @@
   background-size: auto, auto, 24px 24px, 24px 24px;
   background-attachment: fixed;
 }
-.app-header {
-  background-color: color-mix(in oklch, var(--paper) 88%, transparent);
-}

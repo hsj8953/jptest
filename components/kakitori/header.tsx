@@ -8,7 +8,7 @@ export function Header({ user, dark, onHome, onDark, onLogout }: { user: User; d
   const [open, setOpen] = useState(false)
   const initial = user.name.slice(0, 1)
   return (
-    <header className="app-header sticky top-0 z-10 border-b border-border/70 backdrop-blur-md">
+    <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <button onClick={onHome} className="flex items-center gap-2 rounded-lg text-left transition-opacity hover:opacity-80">
           <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><BookOpen className="size-5" /></span>
