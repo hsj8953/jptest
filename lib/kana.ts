@@ -14,8 +14,8 @@ const BASIC: KanaCell[][] = [
   [c('ま', 'ma'), c('み', 'mi'), c('む', 'mu'), c('め', 'me'), c('も', 'mo')],
   [c('や', 'ya'), null, c('ゆ', 'yu'), null, c('よ', 'yo')],
   [c('ら', 'ra'), c('り', 'ri'), c('る', 'ru'), c('れ', 're'), c('ろ', 'ro')],
-  [c('わ', 'wa'), null, null, null, c('を', 'wo')],
-  [c('ん', 'n'), null, null, null, null],
+  // 한 화면에 들어가게 ん을 わ 줄에 같이 넣어요
+  [c('わ', 'wa'), null, c('を', 'wo'), null, c('ん', 'n')],
 ]
 
 const VOICED: KanaCell[][] = [
@@ -30,12 +30,15 @@ const COMBO_BASE: [string, string][] = [
   ['き', 'ky'], ['し', 'sh'], ['ち', 'ch'], ['に', 'ny'], ['ひ', 'hy'], ['み', 'my'], ['り', 'ry'],
   ['ぎ', 'gy'], ['じ', 'j'], ['び', 'by'], ['ぴ', 'py'],
 ]
-const COMBO: KanaCell[][] = COMBO_BASE.map(([k, r]) => [c(k + 'ゃ', r + 'a'), c(k + 'ゅ', r + 'u'), c(k + 'ょ', r + 'o')])
+const COMBO_ROWS = COMBO_BASE.map(([k, r]) => [c(k + 'ゃ', r + 'a'), c(k + 'ゅ', r + 'u'), c(k + 'ょ', r + 'o')])
+// 한 화면에 들어가게 두 묶음씩 나란히 (6칸)
+const COMBO: KanaCell[][] = []
+for (let i = 0; i < COMBO_ROWS.length; i += 2) COMBO.push([...COMBO_ROWS[i], ...(COMBO_ROWS[i + 1] ?? [null, null, null])])
 
 export const HIRAGANA: KanaGroup[] = [
   { id: 'basic', title: '청음 (기본)', cols: 5, rows: BASIC },
   { id: 'voiced', title: '탁음 · 반탁음', cols: 5, rows: VOICED },
-  { id: 'combo', title: '요음', cols: 3, rows: COMBO },
+  { id: 'combo', title: '요음', cols: 6, rows: COMBO },
 ]
 
 /** 히라가나 → 가타카나 */

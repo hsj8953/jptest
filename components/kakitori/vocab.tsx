@@ -63,7 +63,7 @@ function SpeakButton({ text, className = '' }: { text: string; className?: strin
   )
 }
 
-function Segmented<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; icon?: React.ReactNode }[] }) {
+function Segmented<T extends string>({ value, onChange, items, small }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; icon?: React.ReactNode }[]; small?: boolean }) {
   return (
     <div className="inline-flex rounded-xl bg-muted p-1" role="tablist">
       {items.map((it) => (
@@ -72,7 +72,7 @@ function Segmented<T extends string>({ value, onChange, items }: { value: T; onC
           role="tab"
           aria-selected={value === it.id}
           onClick={() => onChange(it.id)}
-          className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${value === it.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`inline-flex ${small ? 'h-8 px-2.5' : 'h-9 px-3'} items-center gap-1.5 rounded-lg text-sm font-medium transition ${value === it.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
         >
           {it.icon}
           {it.label}
@@ -85,17 +85,18 @@ function Segmented<T extends string>({ value, onChange, items }: { value: T; onC
 export function Vocab({ onBack, onGoLine, initialTab }: { onBack: () => void; onGoLine: (songId: string, line: number) => void; initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'hira')
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-      <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+    <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-10">
+      <button onClick={onBack} className="mb-2 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" />곡 목록
       </button>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3 sm:mb-6 sm:items-end sm:gap-4">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">単語帳</p>
-          <h1 className="text-3xl font-bold tracking-tight">단어장</h1>
-          <p className="mt-1 text-sm text-muted-foreground">가나부터 노래에 나온 한자 단어까지 익혀 보세요.</p>
+          <p className="mb-1 hidden text-xs font-semibold uppercase tracking-[0.2em] text-primary sm:block">単語帳</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">단어장</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">가나부터 노래에 나온 한자 단어까지 익혀 보세요.</p>
         </div>
         <Segmented
+          small
           value={tab}
           onChange={setTab}
           items={[
@@ -118,13 +119,15 @@ function KanaTab({ groups, name }: { groups: KanaGroup[]; name: string }) {
   const { vocab } = useStore()
   const [mode, setMode] = useState<'table' | 'quiz'>('table')
   const [active, setActive] = useState<string | null>(null)
+  const [group, setGroup] = useState<KanaGroup['id']>('basic')
   const all = useMemo(() => cellsOf(groups), [groups])
   const mastered = all.filter((k) => (vocab.kana[k.kana] ?? 0) >= MASTER).length
 
   return (
     <section>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3 sm:mb-5">
         <Segmented
+          small
           value={mode}
           onChange={setMode}
           items={[
@@ -138,12 +141,29 @@ function KanaTab({ groups, name }: { groups: KanaGroup[]; name: string }) {
       </div>
 
       {mode === 'table' ? (
-        <div className="flex flex-col gap-6">
-          <p className="text-xs text-muted-foreground">글자를 누르면 발음을 들려줘요. 퀴즈에서 맞힌 글자는 초록색으로 바뀌어요.</p>
-          {groups.map((g) => (
-            <div key={g.id}>
-              <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{g.title}</h2>
-              <div className={`grid gap-1.5 ${g.cols === 5 ? 'grid-cols-5' : 'grid-cols-3'} max-w-xl`}>
+        <div>
+          <div className="mb-2.5 flex gap-1.5 overflow-x-auto" role="tablist" aria-label="글자 묶음">
+            {groups.map((g) => {
+              const cells = cellsOf([g])
+              const done = cells.filter((k) => (vocab.kana[k.kana] ?? 0) >= MASTER).length
+              return (
+                <button
+                  key={g.id}
+                  role="tab"
+                  aria-selected={group === g.id}
+                  onClick={() => setGroup(g.id)}
+                  className={`h-8 shrink-0 rounded-full border px-3 text-sm font-medium transition ${group === g.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'}`}
+                >
+                  {g.title.replace(' (기본)', '')}
+                  <span className={`ml-1.5 text-xs tabular-nums ${group === g.id ? 'opacity-80' : 'opacity-60'}`}>{done}/{cells.length}</span>
+                </button>
+              )
+            })}
+          </div>
+          {groups
+            .filter((g) => g.id === group)
+            .map((g) => (
+              <div key={g.id} className={`grid gap-1 sm:gap-1.5 ${g.cols === 6 ? 'grid-cols-6' : g.cols === 5 ? 'grid-cols-5' : 'grid-cols-3'} max-w-xl`}>
                 {g.rows.flat().map((cell, i) =>
                   cell ? (
                     <KanaButton
@@ -161,8 +181,8 @@ function KanaTab({ groups, name }: { groups: KanaGroup[]; name: string }) {
                   ),
                 )}
               </div>
-            </div>
-          ))}
+            ))}
+          <p className="mt-3 hidden text-xs text-muted-foreground sm:block">글자를 누르면 발음을 들려줘요. 퀴즈에서 여러 번 맞힌 글자는 초록색으로 바뀌어요.</p>
         </div>
       ) : (
         <KanaQuiz groups={groups} />
@@ -176,13 +196,13 @@ function KanaButton({ cell, level, active, onClick }: { cell: NonNullable<KanaCe
   return (
     <button
       onClick={onClick}
-      className={`flex aspect-square flex-col items-center justify-center rounded-xl border transition hover:-translate-y-px hover:shadow-md ${
+      className={`flex h-11 flex-col items-center justify-center rounded-xl border transition hover:-translate-y-px hover:shadow-md sm:h-16 ${
         active ? 'border-primary bg-primary/10 ring-2 ring-primary/30' : done ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40' : 'border-border bg-card hover:border-primary/40'
       }`}
       aria-label={`${cell.kana} ${cell.romaji}`}
     >
-      <span lang="ja" className="font-jp text-2xl leading-none sm:text-3xl">{cell.kana}</span>
-      <span className="mt-1 text-[11px] text-muted-foreground">{cell.romaji}</span>
+      <span lang="ja" className={`font-jp leading-none ${cell.kana.length > 1 ? 'text-lg' : 'text-xl'} sm:text-2xl`}>{cell.kana}</span>
+      <span className="mt-0.5 text-[10px] leading-none text-muted-foreground sm:text-[11px]">{cell.romaji}</span>
     </button>
   )
 }
