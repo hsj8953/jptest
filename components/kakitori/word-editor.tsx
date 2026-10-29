@@ -43,7 +43,7 @@ export function WordEditor({ lines, words, onChange }: { lines: Line[]; words: S
       onChange(result)
       setMsg(
         r.error
-          ? `단어 ${result.length}개를 찾았지만 AI를 쓸 수 없어서(${errText(r.error)}${r.detail ? ` · ${r.detail}` : ''}) 뜻은 비워 뒀어요. 직접 적거나 다시 눌러 주세요.`
+          ? `단어 ${result.length}개를 찾았어요. 일부는 AI를 쓸 수 없어서(${errText(r.error)}${r.detail ? ` · ${r.detail}` : ''}) 뜻이 비어 있어요. 다시 누르면 빈 것만 채워요.`
           : `단어 ${result.length}개를 찾았어요. 틀린 읽기나 뜻은 고치고, 필요 없는 단어는 지워 주세요.`,
       )
     } catch {

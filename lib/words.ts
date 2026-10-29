@@ -46,36 +46,50 @@ export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?
   try {
     const token = await getFirebaseAuth().currentUser?.getIdToken()
     if (!token) throw Object.assign(new Error('unauthorized'), { detail: '' })
-    const CHUNK = 25
+    // 작게 나눠 3묶음씩 동시에 보내요. 실패한 묶음이 있어도 성공한 단어는 남겨요.
+    const CHUNK = 10
     let done = 0
+    let failed = 0
+    let firstErr: { message: string; detail?: string } | null = null
     onProgress?.(0, out.length)
     const starts: number[] = []
     for (let i = 0; i < out.length; i += CHUNK) starts.push(i)
     const runOne = async (s: number) => {
       const part = out.slice(s, s + CHUNK)
-      const res = await fetch('/api/words', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ items: part.map((w) => ({ word: w.word, context: answerOf(lines[w.lines[0]]?.ruby ?? '') })) }),
-      })
-      const text = await res.text()
-      let json: { words?: ({ word: string; reading: string; meaning: string } | null)[]; error?: string; detail?: string } = {}
       try {
-        json = JSON.parse(text)
-      } catch {
-        json = { error: res.status >= 502 ? 'timeout' : 'ai_failed', detail: `서버 응답 ${res.status}` }
+        const res = await fetch('/api/words', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ items: part.map((w) => ({ word: w.word, context: answerOf(lines[w.lines[0]]?.ruby ?? '') })) }),
+        })
+        const text = await res.text()
+        let json: { words?: ({ word: string; reading: string; meaning: string } | null)[]; error?: string; detail?: string } = {}
+        try {
+          json = JSON.parse(text)
+        } catch {
+          json = { error: res.status >= 502 ? 'timeout' : 'ai_failed', detail: `서버 응답 ${res.status}` }
+        }
+        if (!res.ok || !json.words) throw Object.assign(new Error(json.error ?? 'ai_failed'), { detail: json.detail })
+        json.words.forEach((r, j) => {
+          if (!r) return
+          const w = out[s + j]
+          if (r.reading) w.reading = r.reading
+          if (r.meaning) w.meaning = r.meaning
+        })
+      } catch (e) {
+        failed += part.length
+        firstErr ??= { message: (e as Error).message, detail: (e as { detail?: string }).detail }
+      } finally {
+        done += part.length
+        onProgress?.(done, out.length)
       }
-      if (!res.ok || !json.words) throw Object.assign(new Error(json.error ?? 'ai_failed'), { detail: json.detail })
-      json.words.forEach((r, j) => {
-        if (!r) return
-        const w = out[s + j]
-        if (r.reading) w.reading = r.reading
-        if (r.meaning) w.meaning = r.meaning
-      })
-      done += part.length
-      onProgress?.(done, out.length)
     }
     for (let k = 0; k < starts.length; k += 3) await Promise.all(starts.slice(k, k + 3).map(runOne))
+    if (firstErr) {
+      const fe = firstErr as { message: string; detail?: string }
+      error = fe.message
+      detail = `${failed}개 실패${fe.detail ? ` · ${fe.detail}` : ''}`
+    }
   } catch (e) {
     error = (e as Error).message
     detail = (e as { detail?: string }).detail

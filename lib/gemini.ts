@@ -1,11 +1,13 @@
 // 서버에서 Gemini를 부르는 공통 코드: 모델이 없거나 바쁘면 다른 모델로 넘어가고, 시간 제한을 지켜요.
-const MODELS = [process.env.GEMINI_MODEL, 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'].filter(
-  (m, i, a): m is string => !!m && a.indexOf(m) === i,
-)
+const DEFAULT_MODELS = [process.env.GEMINI_MODEL, 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.5-flash-lite']
+const uniq = (list: (string | undefined)[]) => list.filter((m, i, a): m is string => !!m && a.indexOf(m) === i)
+
+/** 빠른 모델 먼저 (단어 뜻처럼 쉬운 작업용) */
+export const FAST_MODELS = uniq(['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', ...DEFAULT_MODELS])
 
 export type GeminiResult = { ok: true; json: unknown } | { ok: false; error: string; detail: string; status: number }
 
-export async function callGemini(system: string, user: string, schema: object, budgetMs = 24000): Promise<GeminiResult> {
+export async function callGemini(system: string, user: string, schema: object, budgetMs = 24000, models: string[] = uniq(DEFAULT_MODELS)): Promise<GeminiResult> {
   const key = process.env.GEMINI_API_KEY
   if (!key) return { ok: false, error: 'no_key', detail: '', status: 503 }
   const payload = JSON.stringify({
@@ -17,7 +19,7 @@ export async function callGemini(system: string, user: string, schema: object, b
   const busy = (s: number) => s === 500 || s === 502 || s === 503
   let last: Response | null = null
   let detail = ''
-  outer: for (const model of MODELS) {
+  outer: for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const left = budgetMs - (Date.now() - started)
       if (left < 3000) break outer

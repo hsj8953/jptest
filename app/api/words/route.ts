@@ -1,7 +1,7 @@
 // 단어장: 한자 단어의 사전형 읽기와 한국어 뜻을 Gemini로 만들어요 (관리자 전용)
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/server-auth'
-import { callGemini } from '@/lib/gemini'
+import { FAST_MODELS, callGemini } from '@/lib/gemini'
 
 export const runtime = 'nodejs'
 export const maxDuration = 26
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     : []
   if (!items.length || items.length > 60) return NextResponse.json({ error: 'bad_request' }, { status: 400 })
 
-  const r = await callGemini(PROMPT, JSON.stringify({ items }), SCHEMA)
+  const r = await callGemini(PROMPT, JSON.stringify({ items }), SCHEMA, 24000, FAST_MODELS)
   if (!r.ok) return NextResponse.json({ error: r.error, detail: r.detail }, { status: r.status })
   const out = (r.json as { words?: { word?: string; reading?: string; meaning?: string }[] }).words ?? []
   const byWord = new Map(out.filter((w) => typeof w.word === 'string').map((w) => [w.word as string, w]))
