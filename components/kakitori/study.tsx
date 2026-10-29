@@ -14,6 +14,8 @@ import { Results } from './results'
 
 type Result = { ok: boolean; input: string; revealed: boolean }
 
+const HINT_KEY = 'kakitori.hint.listen.v1'
+
 export function Study({ song, user, onBack }: { song: Song; user: User; onBack: () => void }) {
   const { progress } = useStore()
   const prog = progress[song.id] ?? {}
@@ -35,7 +37,43 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const answerRef = useRef<HTMLTextAreaElement>(null)
   const koRef = useRef<HTMLInputElement>(null)
   const [needKo, setNeedKo] = useState(false)
-  const yt = useYouTube(song.youtubeId)
+  // 유튜브 화면의 ▶를 눌러도 지금 문장 구간만 재생되게 해요
+  const segRef = useRef<{ start: number | null; end: () => number; loop: boolean }>({ start: null, end: () => 0, loop: false })
+  const [autoNote, setAutoNote] = useState(false)
+  const yt = useYouTube(song.youtubeId, {
+    onUnmanagedPlay: () => {
+      const s = segRef.current
+      if (s.start == null) return // 타이밍이 없는 문장은 그냥 재생
+      ytRef.current?.playSegment(s.start, s.end(), s.loop)
+      setAutoNote(true)
+      dismissHint()
+    },
+  })
+  const ytRef = useRef(yt)
+  ytRef.current = yt
+  useEffect(() => {
+    if (!autoNote) return
+    const t = window.setTimeout(() => setAutoNote(false), 3500)
+    return () => window.clearTimeout(t)
+  }, [autoNote])
+
+  // 처음 온 사람에게 구간 듣기 안내 말풍선
+  const [showHint, setShowHint] = useState(false)
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem(HINT_KEY)) setShowHint(true)
+    } catch {
+      setShowHint(true)
+    }
+  }, [])
+  const dismissHint = () => {
+    setShowHint(false)
+    try {
+      window.localStorage.setItem(HINT_KEY, '1')
+    } catch {
+      /* 무시 */
+    }
+  }
   const theme = useSongHue(song)
 
   useEffect(() => watchScores(song.id, setScores), [song.id])
@@ -96,6 +134,7 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
   const okCount = countCorrect(prog, total)
   const endOf = (k: number) => L.slice(k + 1).find((l) => l.start != null)?.start ?? yt.duration ?? (L[k].start ?? 0) + 8
   const canPlay = !!song.youtubeId && yt.ready && sentence.start != null
+  segRef.current = { start: sentence.start, end: () => endOf(current), loop: repeat }
 
   const save = (next: typeof prog) => {
     setSaveError('')
@@ -154,24 +193,54 @@ export function Study({ song, user, onBack }: { song: Song; user: User; onBack: 
             )}
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          <div className="relative mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
-              onClick={() => (yt.segActive ? yt.stop() : yt.playSegment(sentence.start, endOf(current), repeat))}
+              onClick={() => {
+                dismissHint()
+                if (yt.segActive) yt.stop()
+                else yt.playSegment(sentence.start, endOf(current), repeat)
+              }}
               disabled={!canPlay}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              className={`inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground shadow-md transition hover:-translate-y-px hover:bg-primary/90 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 ${showHint && canPlay ? 'listen-pulse' : ''}`}
             >
-              {yt.segActive ? <><Pause className="size-4" />멈추기</> : <><Headphones className="size-4" />구간 듣기</>}
+              {yt.segActive ? (
+                <><Pause className="size-5" />멈추기</>
+              ) : (
+                <><Headphones className="size-5" />{current + 1}번 문장 듣기</>
+              )}
             </button>
-            {song.youtubeId && sentence.start == null && <span className="text-xs text-amber-600 dark:text-amber-400">이 문장은 아직 타이밍이 없어요</span>}
-            <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={repeat} onChange={(e) => { setRepeat(e.target.checked); yt.setLoop(e.target.checked) }} className="accent-primary" />반복
-            </label>
-            <select value={speed} onChange={(e) => setSpeed(e.target.value)} className="rounded-lg border border-border bg-background px-2 py-2 text-sm" aria-label="재생 속도">
-              <option value="1">1배속</option>
-              <option value="0.75">0.75배속</option>
-              <option value="0.5">0.5배속</option>
-            </select>
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <label className="flex h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm text-muted-foreground">
+                <input type="checkbox" checked={repeat} onChange={(e) => { setRepeat(e.target.checked); yt.setLoop(e.target.checked) }} className="size-4 accent-primary" />반복
+              </label>
+              <select value={speed} onChange={(e) => setSpeed(e.target.value)} className="h-11 rounded-xl border border-border bg-background px-3 text-sm" aria-label="재생 속도">
+                <option value="1">1배속</option>
+                <option value="0.75">0.75배속</option>
+                <option value="0.5">0.5배속</option>
+              </select>
+            </div>
+
+            {showHint && canPlay && (
+              <div role="note" className="hint-pop absolute left-0 right-0 top-full z-10 mt-3 sm:right-auto sm:w-96">
+                <span className="absolute -top-1.5 left-8 size-3 rotate-45 border-l border-t border-primary/40 bg-card" aria-hidden />
+                <div className="rounded-2xl border border-primary/40 bg-card p-4 text-sm shadow-xl">
+                  <p className="font-semibold text-foreground">🎧 여기를 눌러 한 문장씩 들어보세요</p>
+                  <ul className="mt-2 flex flex-col gap-1.5 text-muted-foreground">
+                    <li>· 문장이 끝나면 자동으로 멈춰요.</li>
+                    <li>· <b className="text-foreground">반복</b>에 체크하면 그 문장을 계속 반복해요.</li>
+                    <li>· 오른쪽 <b className="text-foreground">배속</b>에서 0.75배·0.5배로 천천히 들을 수 있어요.</li>
+                  </ul>
+                  <div className="mt-3 flex justify-end">
+                    <button onClick={dismissHint} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90">알겠어요</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+          {song.youtubeId && sentence.start == null && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">이 문장은 아직 타이밍이 없어요</p>}
+          {autoNote && (
+            <p className="hint-pop mt-2 text-xs text-muted-foreground" role="status">유튜브 재생 대신 {current + 1}번 문장 구간만 들려드리고 있어요.</p>
+          )}
 
           <div className="mt-8 flex items-end justify-between gap-3">
             <div className="min-w-0">

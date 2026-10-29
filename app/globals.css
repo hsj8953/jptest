@@ -371,3 +371,20 @@
   .login-float { display: none; }
   .login-eq i { height: 70%; }
 }
+
+/* ── 구간 듣기 안내 ─────────────────────────── */
+@keyframes listen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 45%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in oklch, var(--primary) 0%, transparent); }
+}
+@keyframes hint-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .listen-pulse { animation: listen-pulse 1.6s ease-in-out infinite; }
+  .hint-pop { animation: hint-pop 250ms ease-out both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-pulse { outline: 3px solid color-mix(in oklch, var(--primary) 45%, transparent); outline-offset: 2px; }
+}

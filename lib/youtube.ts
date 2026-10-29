@@ -55,8 +55,15 @@ export function fmtTime(t: number | null | undefined) {
 
 type Segment = { start: number; end: number; loop: boolean }
 
+type Options = {
+  /** 구간 재생이 아닌데 영상이 재생되기 시작했을 때 (예: 유튜브 화면의 ▶를 직접 누름) */
+  onUnmanagedPlay?: () => void
+}
+
 /** 페이지 안 유튜브 플레이어 + 문장 구간 재생 */
-export function useYouTube(videoId: string | null | undefined) {
+export function useYouTube(videoId: string | null | undefined, options: Options = {}) {
+  const opts = useRef(options)
+  opts.current = options
   const hostRef = useRef<HTMLDivElement | null>(null)
   const player = useRef<any>(null)
   const seg = useRef<Segment | null>(null)
@@ -86,7 +93,11 @@ export function useYouTube(videoId: string | null | undefined) {
           },
           onStateChange: (e: any) => {
             setPlaying(e.data === 1)
-            if (e.data === 1) setDuration(player.current?.getDuration?.() || null)
+            if (e.data === 1) {
+              setDuration(player.current?.getDuration?.() || null)
+              // 우리 구간 재생이 아닌데 재생이 시작됨 → 화면에 알려서 구간 재생으로 바꿀 수 있게
+              if (!seg.current) opts.current.onUnmanagedPlay?.()
+            }
           },
         },
       })
@@ -114,6 +125,11 @@ export function useYouTube(videoId: string | null | undefined) {
       const t = p.getCurrentTime() as number
       setTime(t)
       const s = seg.current
+      // 구간 재생 중에 진행 막대를 앞으로 끌어 이전 부분으로 가면 구간 시작으로 되돌려요
+      if (s && t < s.start - 0.75) {
+        p.seekTo(s.start, true)
+        return
+      }
       if (s && t >= s.end) {
         if (s.loop) p.seekTo(s.start, true)
         else {
