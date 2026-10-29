@@ -46,13 +46,18 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
     setBusy(true)
     setFuriMsg('읽기를 만드는 중… (처음 한 번은 사전을 불러오느라 몇 초 걸려요)')
     try {
-      const { results, aiUsed, aiError, aiDetail } = await generateFurigana(
+      const { results, aiUsed, aiError, aiDetail, aiFailed } = await generateFurigana(
         rows.map((l) => l.ruby),
         (done, total) => setFuriMsg(`AI가 읽기를 만드는 중… ${done} / ${total}`),
       )
       setRows(rows.map((l, i) => ({ ...l, ruby: results[i].ruby, check: results[i].check })))
       const flagged = results.reduce((n, r) => n + r.check.length, 0)
-      const base = aiUsed ? 'AI로 읽기를 넣었어요.' : `AI를 쓸 수 없어서(${aiErrorText(aiError)}${aiDetail ? ` · ${aiDetail}` : ''}) 사전으로만 넣었어요.`
+      const why = `${aiErrorText(aiError)}${aiDetail ? ` · ${aiDetail}` : ''}`
+      const base = !aiUsed
+        ? `AI를 쓸 수 없어서(${why}) 사전으로만 넣었어요.`
+        : aiFailed
+          ? `AI로 읽기를 넣었어요. 다만 ${aiFailed}문장은 AI를 쓸 수 없어서(${why}) 사전으로 넣고 노랗게 표시했어요.`
+          : 'AI로 읽기를 넣었어요.'
       setFuriMsg(flagged ? `${base} 노란 단어 ${flagged}개는 노래를 들으며 확인해 주세요.` : base)
     } catch {
       setFuriMsg('읽기를 만들지 못했어요. 漢字{かんじ} 형식으로 직접 적어 주세요.')
