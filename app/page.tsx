@@ -8,26 +8,29 @@ import { Study } from '@/components/kakitori/study'
 import { Editor } from '@/components/kakitori/editor'
 import { Timing } from '@/components/kakitori/timing'
 import { Invite } from '@/components/kakitori/invite'
+import { Vocab } from '@/components/kakitori/vocab'
 import { Login, NotInvited, SetupNeeded } from '@/components/kakitori/login'
 import { ADMIN_EMAIL, firebaseConfigured, getFirebaseAuth, googleProvider } from '@/lib/firebase'
 import { isInvited, startSync, stopSync, useStore } from '@/lib/store'
 import type { User } from '@/lib/types'
 
-type View = 'library' | 'study' | 'editor' | 'timing' | 'invite'
+type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab'
 type AuthState = 'loading' | 'out' | 'not-invited' | 'in'
-type Route = { view: View; id: string | null }
+type Route = { view: View; id: string | null; line?: number | null }
 
 // 화면 위치를 주소(?v=study&song=곡ID)에 기록해서 새로고침 · 뒤로가기 · 링크 공유가 되게 해요
-const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite']
+const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab']
 function readRoute(): Route {
   const p = new URLSearchParams(window.location.search)
   const v = p.get('v') as View | null
-  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song') }
+  const line = p.get('line')
+  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song'), line: line != null && /^\d+$/.test(line) ? Number(line) : null }
 }
 function routeUrl(r: Route) {
   if (r.view === 'library') return window.location.pathname
   const p = new URLSearchParams({ v: r.view })
   if (r.id) p.set('song', r.id)
+  if (r.line != null) p.set('line', String(r.line))
   return `${window.location.pathname}?${p.toString()}`
 }
 
@@ -68,6 +71,7 @@ export default function Page() {
   const { songs, ready } = useStore()
   const [view, setView] = useState<View>('library')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [line, setLine] = useState<number | null>(null)
   const { dark, toggle } = useDarkMode()
 
   useEffect(() => {
@@ -75,6 +79,7 @@ export default function Page() {
       const r = readRoute()
       setView(r.view)
       setSelectedId(r.id)
+      setLine(r.line ?? null)
     }
     apply()
     const onPop = () => {
@@ -160,10 +165,11 @@ export default function Page() {
 
   const isAdmin = user.isAdmin
   const selected = songs.find((s) => s.id === selectedId)
-  const go = (v: View, id: string | null = selectedId) => {
-    const url = routeUrl({ view: v, id })
+  const go = (v: View, id: string | null = selectedId, ln: number | null = null) => {
+    const url = routeUrl({ view: v, id, line: ln })
     if (url !== window.location.pathname + window.location.search) window.history.pushState(null, '', url)
     setSelectedId(id)
+    setLine(ln)
     setView(v)
     window.scrollTo(0, 0)
   }
@@ -176,6 +182,7 @@ export default function Page() {
       onTiming={(id) => go('timing', id)}
       onInvite={() => go('invite', null)}
       onNew={() => go('editor', null)}
+      onVocab={() => go('vocab', null)}
     />
   )
 
@@ -183,9 +190,10 @@ export default function Page() {
   const needsSong = view === 'study' || view === 'timing' || (view === 'editor' && !!selectedId)
   if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
+  else if (view === 'vocab') body = <Vocab onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
   else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? 'new'} song={selected} onBack={goLibrary} onSaved={(id) => go('timing', id)} />
   else if (view === 'timing' && isAdmin && selected) body = <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
-  else if (view === 'study' && selected) body = <Study key={selected.id} song={selected} user={user} onBack={goLibrary} />
+  else if (view === 'study' && selected) body = <Study key={`${selected.id}-${line ?? ''}`} song={selected} user={user} initialLine={line} onBack={goLibrary} />
 
   return (
     <div className="min-h-screen bg-background">

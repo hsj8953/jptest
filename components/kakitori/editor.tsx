@@ -8,7 +8,8 @@ import { generateFurigana } from '@/lib/furigana'
 import { RubyEditable } from './ruby-edit'
 import { KANJI, baseText, normalizeKanji } from '@/lib/ruby'
 import { parseYouTubeId } from '@/lib/youtube'
-import type { Line, Song } from '@/lib/types'
+import type { Line, Song, SongWord } from '@/lib/types'
+import { WordEditor } from './word-editor'
 import { BackButton, Furigana } from './furigana'
 
 // 붙여넣은 가사의 부수·호환 한자는 일반 한자로 정리해요
@@ -25,6 +26,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
   const [furiMsg, setFuriMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [words, setWords] = useState<SongWord[]>(song?.words ?? [])
 
   const jpCount = splitLines(jp).length
   const koCount = splitLines(ko).length
@@ -69,7 +71,10 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
     setBusy(true)
     setError('')
     try {
-      await actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, createdAt: song?.createdAt ?? Date.now() })
+      const cleanWords = words
+        .map((w) => ({ ...w, word: normalizeKanji(w.word).trim(), reading: w.reading.trim(), meaning: w.meaning.trim() }))
+        .filter((w) => w.word)
+      await actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, words: cleanWords, createdAt: song?.createdAt ?? Date.now() })
       onSaved(id)
     } catch {
       setError('저장하지 못했어요. 관리자 계정인지, 인터넷이 연결돼 있는지 확인해 주세요.')
@@ -141,6 +146,8 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
           </div>
         </div>
       )}
+
+      {rows && rows.length > 0 && <WordEditor lines={rows} words={words} onChange={setWords} />}
 
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
         {error && <p className="mr-auto text-sm text-destructive">{error}</p>}

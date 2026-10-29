@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Trash2, UserPlus } from 'lucide-react'
+import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Trash2, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrect, useStore } from '@/lib/store'
 import type { Song } from '@/lib/types'
@@ -11,13 +11,14 @@ import { ThemedCard } from './themed'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab }: {
   isAdmin: boolean
   onSelect: (id: string) => void
   onEdit: (id: string) => void
   onTiming: (id: string) => void
   onInvite: () => void
   onNew: () => void
+  onVocab: () => void
 }) {
   const { songs, progress, touched, ready, error } = useStore()
   const [delError, setDelError] = useState('')
@@ -38,12 +39,15 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew }
           <h1 className="font-jp text-3xl font-bold tracking-tight sm:text-4xl">어떤 노래를 적어볼까요?</h1>
           <p className="mt-2 text-sm text-muted-foreground">가사를 듣고, 천천히 한 글자씩 기록해 보세요.</p>
         </div>
-        {isAdmin && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onInvite}><UserPlus data-icon="inline-start" />친구 초대</Button>
-            <Button onClick={onNew}><Plus data-icon="inline-start" />새 곡 등록</Button>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
+          {isAdmin && (
+            <>
+              <Button variant="outline" onClick={onInvite} className="h-10 px-3"><UserPlus data-icon="inline-start" />친구 초대</Button>
+              <Button onClick={onNew} className="h-10 px-3"><Plus data-icon="inline-start" />새 곡 등록</Button>
+            </>
+          )}
+        </div>
       </div>
 
       {recent && (

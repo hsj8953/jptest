@@ -16,12 +16,13 @@ type Result = { ok: boolean; input: string; revealed: boolean }
 
 const HINT_KEY = 'kakitori.hint.listen.v1'
 
-export function Study({ song, user, onBack }: { song: Song; user: User; onBack: () => void }) {
+export function Study({ song, user, onBack, initialLine }: { song: Song; user: User; onBack: () => void; initialLine?: number | null }) {
   const { progress } = useStore()
   const prog = progress[song.id] ?? {}
   const L = song.lines
   const total = L.length
   const [current, setCurrent] = useState(() => {
+    if (initialLine != null && initialLine >= 0 && initialLine < total) return initialLine
     const first = L.findIndex((_, k) => !prog[k]?.ok)
     return first < 0 ? 0 : first
   })

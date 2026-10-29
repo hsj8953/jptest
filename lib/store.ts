@@ -9,7 +9,7 @@
 import { useSyncExternalStore } from 'react'
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
 import { getDb } from './firebase'
-import type { Song, SongProgress, User } from './types'
+import type { Song, SongProgress, User, VocabProgress } from './types'
 
 type State = {
   ready: boolean
@@ -18,10 +18,12 @@ type State = {
   /** 곡별 마지막으로 공부한 시각 (ms) — 이어서 하기에 써요 */
   touched: Record<string, number>
   invites: string[]
+  /** 단어장 진도 (나만 봄) */
+  vocab: VocabProgress
   error: string | null
 }
 
-const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], error: null }
+const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], vocab: { words: {}, kana: {} }, error: null }
 let state: State = empty
 let me: User | null = null
 let unsubs: (() => void)[] = []
@@ -85,6 +87,16 @@ export function startSync(user: User) {
         progIn = true
         markReady()
       },
+    ),
+  )
+  unsubs.push(
+    onSnapshot(
+      doc(db, 'users', user.uid, 'meta', 'vocab'),
+      (snap) => {
+        const d = snap.data() ?? {}
+        set({ vocab: { words: { ...(d.words ?? {}) }, kana: { ...(d.kana ?? {}) } } })
+      },
+      () => {},
     ),
   )
   if (user.isAdmin) {
@@ -154,6 +166,12 @@ export const actions = {
     set({ progress: { ...state.progress, [songId]: p }, touched: { ...state.touched, [songId]: now } })
     await setDoc(doc(db, 'users', me.uid, 'progress', songId), { lines: p, touchedAt: now, updatedAt: serverTimestamp() })
     await setDoc(doc(db, 'songs', songId, 'scores', me.uid), { name: me.name, ok: countCorrect(p, total), total, updatedAt: serverTimestamp() })
+  },
+  /** 단어장 진도 저장. 바뀐 항목만 넘기면 돼요. 예: { words: { '夜空|よぞら': 2 } } */
+  async saveVocab(patch: Partial<VocabProgress>) {
+    if (!me) return
+    set({ vocab: { words: { ...state.vocab.words, ...(patch.words ?? {}) }, kana: { ...state.vocab.kana, ...(patch.kana ?? {}) } } })
+    await setDoc(doc(getDb(), 'users', me.uid, 'meta', 'vocab'), { ...patch, updatedAt: serverTimestamp() }, { merge: true })
   },
   async setInvites(emails: string[]) {
     await setDoc(doc(getDb(), 'config', 'access'), { emails })
