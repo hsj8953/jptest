@@ -146,6 +146,25 @@ const FALLBACK_KANA = ['さよなら', 'ありがとう', 'メロディ', 'い�
 const FALLBACK_LATIN = ['love', 'dream', 'heart', 'baby', 'forever', 'tonight', 'smile', 'shine']
 
 const FALLBACK = ['心', '夢', '空', '花', '雨', '光', '声', '涙', '時間', '世界', '明日', '未来', '季節', '言葉', '景色']
+const FALLBACK_READING: Record<string, string> = { 心: 'こころ', 夢: 'ゆめ', 空: 'そら', 花: 'はな', 雨: 'あめ', 光: 'ひかり', 声: 'こえ', 涙: 'なみだ', 時間: 'じかん', 世界: 'せかい', 明日: 'あした', 未来: 'みらい', 季節: 'きせつ', 言葉: 'ことば', 景色: 'けしき' }
+
+const readingCache = new WeakMap<Song, Map<string, string>>()
+/** 이 곡에 나오는 한자 단어 → 읽기 (가사 후리가나, 단어장, 기본 단어 순) */
+export function readingMap(song: Song) {
+  const hit = readingCache.get(song)
+  if (hit) return hit
+  const m = new Map<string, string>()
+  const add = (t: string, r?: string) => { if (r && !m.get(t)) m.set(t, r) }
+  song.lines.forEach((l) => units(l.ruby).units.forEach((u) => add(u.text, u.reading)))
+  ;(song.words ?? []).forEach((w) => add(w.word, w.reading))
+  Object.entries(FALLBACK_READING).forEach(([t, r]) => add(t, r))
+  readingCache.set(song, m)
+  return m
+}
+/** 보기 위에 달 후리가나 (한자가 없거나 읽기를 모르면 빈 문자열) */
+export function choiceReading(song: Song, text: string) {
+  return /[\u3400-\u9FFF々]/.test(text) ? readingMap(song).get(text) ?? '' : ''
+}
 
 /** 쉬움 모드 보기 4개 (정답 + 같은 곡의 다른 한자 단어) */
 export function choicesFor(song: Song, lineIndex: number, blank: number) {
@@ -162,7 +181,10 @@ export function choicesFor(song: Song, lineIndex: number, blank: number) {
   const same = new Set(all.map((a) => a.text.toLowerCase()))
   for (const t of [...pool]) if (same.has(t.toLowerCase())) pool.delete(t)
   const seed = hash(`${song.id}:${lineIndex}:${blank}`)
+  const rm = readingMap(song)
   const ranked = [...pool].sort((a, b) => {
+    // 한자 보기는 후리가나를 달 수 있는 단어를 먼저 써요
+    if (want === 'kanji' && rm.has(a) !== rm.has(b)) return rm.has(a) ? -1 : 1
     const da = Math.abs(a.length - answer.length)
     const db = Math.abs(b.length - answer.length)
     return da - db || (hash(a + seed) % 997) - (hash(b + seed) % 997)

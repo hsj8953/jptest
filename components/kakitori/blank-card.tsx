@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { blankCorrect, blanksFor, choicesFor } from '@/lib/blanks'
+import { blankCorrect, blanksFor, choiceReading, choicesFor } from '@/lib/blanks'
 import { normalizeKanji } from '@/lib/ruby'
 import type { LineProgress, Song } from '@/lib/types'
 import { Furigana } from './furigana'
@@ -131,7 +131,7 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
                   {!right && answers[b] && !graded.revealed && <span className="text-sm text-destructive line-through">{answers[b]}</span>}
                   <ruby className={`rounded-md px-1.5 ${right ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-destructive/10 text-destructive'}`}>
                     {ans.text}
-                    <rt className="text-[0.5em] text-muted-foreground">{ans.reading}</rt>
+                    <rt className="text-[0.5em] text-muted-foreground">{ans.reading || choiceReading(song, ans.text)}</rt>
                   </ruby>
                 </span>
               )
@@ -189,9 +189,16 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
                 key={c}
                 type="button"
                 onClick={() => pick(active, c)}
-                className={`min-h-12 rounded-xl border px-3 py-2 font-jp text-lg transition hover:border-primary/60 hover:bg-muted ${answers[active] === c ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
+                className={`min-h-14 rounded-xl border px-3 py-2 font-jp text-lg leading-[2.2] transition hover:border-primary/60 hover:bg-muted ${answers[active] === c ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
               >
-                {c}
+                {choiceReading(song, c) ? (
+                  <ruby>
+                    {c}
+                    <rt className="text-[0.55em] text-muted-foreground">{choiceReading(song, c)}</rt>
+                  </ruby>
+                ) : (
+                  c
+                )}
               </button>
             ))}
           </div>
