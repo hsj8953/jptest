@@ -26,7 +26,7 @@ export function NicknameForm({ initial, first, onSave, onCancel }: { initial: st
   }
 
   return (
-    <main className="grid min-h-screen place-items-center px-4">
+    <main className="app-paper grid min-h-screen place-items-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary">{first ? '처음 오셨네요' : '닉네임 바꾸기'}</p>
         <h1 className="mt-2 text-2xl font-bold">닉네임을 정해 주세요</h1>
