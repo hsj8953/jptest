@@ -181,10 +181,10 @@ export function choicesFor(song: Song, lineIndex: number, blank: number) {
   const same = new Set(all.map((a) => a.text.toLowerCase()))
   for (const t of [...pool]) if (same.has(t.toLowerCase())) pool.delete(t)
   const seed = hash(`${song.id}:${lineIndex}:${blank}`)
+  // 한자 보기는 후리가나를 달 수 있는 단어만 써요 (모자라면 아래 기본 단어로 채워요)
   const rm = readingMap(song)
+  if (want === 'kanji') for (const t of [...pool]) if (!rm.has(t)) pool.delete(t)
   const ranked = [...pool].sort((a, b) => {
-    // 한자 보기는 후리가나를 달 수 있는 단어를 먼저 써요
-    if (want === 'kanji' && rm.has(a) !== rm.has(b)) return rm.has(a) ? -1 : 1
     const da = Math.abs(a.length - answer.length)
     const db = Math.abs(b.length - answer.length)
     return da - db || (hash(a + seed) % 997) - (hash(b + seed) % 997)
