@@ -255,7 +255,7 @@ export function ListenOnlyCard({ song, lineIndex, nav }: { song: Song; lineIndex
   return (
     <div className="mt-5 rounded-2xl border border-dashed border-border bg-card p-4 sm:p-6">
       <p className="text-sm font-semibold">이 문장은 빈칸이 없어요</p>
-      <p className="mt-1 text-xs text-muted-foreground">한자가 없는 문장이라 듣고 따라 읽어 보세요. 기록에는 들어가지 않아요.</p>
+      <p className="mt-1 text-xs text-muted-foreground">빈칸으로 만들 단어가 없는 짧은 문장이라 듣고 따라 읽어 보세요. 기록에는 들어가지 않아요.</p>
       <p className="mt-4 font-jp text-xl leading-loose"><Furigana text={normalizeKanji(line.ruby)} /></p>
       <p className="mt-2 text-base text-muted-foreground">{line.ko}</p>
       {nav}

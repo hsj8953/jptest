@@ -73,7 +73,7 @@ export function DifficultyPicker({ song, onPick, onBack }: { song: Song; onPick:
                     <ProgressBar value={(ok / total) * 100} />
                   </span>
                 ) : (
-                  <span className="mt-3 block text-xs text-muted-foreground">이 곡에는 빈칸을 만들 한자 단어가 없어요.</span>
+                  <span className="mt-3 block text-xs text-muted-foreground">이 곡에는 빈칸으로 만들 단어가 없어요.</span>
                 )}
               </span>
               <ChevronRight className="mt-3 size-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
