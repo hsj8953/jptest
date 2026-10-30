@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { actions, newSongId } from '@/lib/store'
 import { generateFurigana } from '@/lib/furigana'
 import { RubyEditable } from './ruby-edit'
-import { KANJI, baseText, normalizeKanji } from '@/lib/ruby'
+import { KANJI, baseText, normalizeKanji, splitRuby } from '@/lib/ruby'
+import { fullyRead, htmlToRuby, parenToRuby } from '@/lib/paste-lyrics'
 import { parseYouTubeId } from '@/lib/youtube'
 import type { Line, Song, SongWord } from '@/lib/types'
 import { WordEditor } from './word-editor'
@@ -41,15 +42,39 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
   }
   const edit = (i: number, key: 'ruby' | 'ko', v: string) => setRows((r) => r?.map((l, j) => (j === i ? { ...l, [key]: v } : l)) ?? r)
 
+  // 가사 사이트에서 후리가나째 복사하면 노래에서 부르는 읽기 그대로 들어가요
+  const [pasteMsg, setPasteMsg] = useState('')
+  const onPasteJp = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const html = e.clipboardData.getData('text/html')
+    const plain = e.clipboardData.getData('text/plain')
+    let text = html ? htmlToRuby(html) : null
+    if (text == null) {
+      const conv = parenToRuby(plain)
+      if (conv === plain) return setPasteMsg('')
+      text = conv
+    }
+    e.preventDefault()
+    const el = e.currentTarget
+    const next = jp.slice(0, el.selectionStart) + text + jp.slice(el.selectionEnd)
+    setJp(next)
+    const n = (text.match(/\{/g) ?? []).length
+    setPasteMsg(`후리가나 ${n}개를 가사 사이트의 읽기 그대로 넣었어요.`)
+  }
+
   const autoFurigana = async () => {
     if (!rows) return
+    // 이미 모든 한자에 읽기가 있는 줄(가사 사이트에서 붙여넣은 줄, 직접 고친 줄)은 건드리지 않아요
+    const need = rows.map((l, i) => (KANJI.test(baseText(l.ruby)) && !fullyRead(l.ruby, splitRuby) ? i : -1)).filter((i) => i >= 0)
+    if (!need.length) return setFuriMsg('모든 한자에 이미 읽기가 있어요. 고칠 한자는 눌러서 직접 고쳐 주세요.')
     setBusy(true)
     setFuriMsg('읽기를 만드는 중… (처음 한 번은 사전을 불러오느라 몇 초 걸려요)')
     try {
-      const { results, aiUsed, aiError, aiDetail, aiFailed } = await generateFurigana(
-        rows.map((l) => l.ruby),
-        (done, total, note) => setFuriMsg(note ?? `AI가 읽기를 만드는 중… ${done} / ${total}`),
+      const { results: part, aiUsed, aiError, aiDetail, aiFailed } = await generateFurigana(
+        need.map((i) => rows[i].ruby),
+        (done, total, note) => setFuriMsg(note ?? `AI가 읽기가 빠진 ${total}문장을 채우는 중… ${done} / ${total}`),
       )
+      const results = rows.map((l) => ({ ruby: l.ruby, check: l.check ?? [] }))
+      need.forEach((i, k) => (results[i] = part[k]))
       setRows(rows.map((l, i) => ({ ...l, ruby: results[i].ruby, check: results[i].check })))
       const flagged = results.reduce((n, r) => n + r.check.length, 0)
       const why = `${aiErrorText(aiError)}${aiDetail ? ` · ${aiDetail}` : ''}`
@@ -109,7 +134,10 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label className="text-sm font-semibold">일본어 가사 <span className="font-normal text-muted-foreground">({jpCount}줄)</span>
-          <textarea id="song-jp" lang="ja" value={jp} onChange={(e) => setJp(e.target.value)} placeholder="한 줄에 한 문장씩 붙여넣어 주세요" className="jp-writing mt-2 min-h-48 w-full rounded-xl border border-input bg-background p-4 font-jp font-normal leading-8 outline-none focus:ring-2 focus:ring-ring" />
+          <textarea id="song-jp" lang="ja" value={jp} onChange={(e) => setJp(e.target.value)} onPaste={onPasteJp} placeholder="한 줄에 한 문장씩 붙여넣어 주세요" className="jp-writing mt-2 min-h-48 w-full rounded-xl border border-input bg-background p-4 font-jp font-normal leading-8 outline-none focus:ring-2 focus:ring-ring" />
+          <span className="mt-1.5 block text-xs font-normal leading-5 text-muted-foreground">
+            {pasteMsg || 'UtaTen처럼 후리가나가 달린 가사 사이트에서 복사해 붙여넣으면, 노래에서 부르는 읽기가 그대로 들어가요. 漢字(かんじ) 형식도 돼요.'}
+          </span>
         </label>
         <label className="text-sm font-semibold">한국어 해석 <span className="font-normal text-muted-foreground">({koCount}줄)</span>
           <textarea id="song-ko" value={ko} onChange={(e) => setKo(e.target.value)} placeholder="일본어 가사와 같은 줄 순서로 적어 주세요" className="mt-2 min-h-48 w-full rounded-xl border border-input bg-background p-4 font-normal leading-8 outline-none focus:ring-2 focus:ring-ring" />
