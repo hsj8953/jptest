@@ -405,7 +405,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
           </div>
           ) : isGraded(current) ? (
             <BlankCard
-              key={`${difficulty}-${current}-${p.tries ?? 0}-${p.revealed ? 1 : 0}`}
+              key={`${difficulty}-${current}`}
               song={song}
               lineIndex={current}
               mode={difficulty}
