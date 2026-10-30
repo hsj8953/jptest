@@ -48,6 +48,8 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
     const html = e.clipboardData.getData('text/html')
     const plain = e.clipboardData.getData('text/plain')
     let text = html ? htmlToRuby(html) : null
+    // 개발자 도구에서 '요소 복사'한 HTML 코드를 그대로 붙여넣은 경우
+    if (text == null && /<(ruby|span)[\s>]/i.test(plain)) text = htmlToRuby(plain)
     if (text == null) {
       const conv = parenToRuby(plain)
       if (conv === plain) return setPasteMsg('')
