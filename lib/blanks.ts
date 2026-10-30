@@ -16,6 +16,8 @@ export type BlankLine = {
 
 // 帰り道·落ち葉·話し声처럼 한자 사이에 끼는 한 글자 가나만 이어 붙여요 (조사 に·が·の 등은 제외)
 const KANA_GLUE = /^[りちきしみえけれせ]$/
+// 읽기가 없는 한자 덩어리는 飛び方·過ぎ去る처럼 동사 연용형 한 글자도 이어 붙여요
+const KANA_GLUE_LOOSE = /^[りちきしみえけれせびぎ]$/
 
 function hash(s: string) {
   let h = 2166136261
@@ -30,7 +32,7 @@ function units(ruby: string) {
   for (let i = 0; i < segs.length; i++) {
     if (!segs[i].kanji) continue
     let to = i
-    while (to + 2 < segs.length && !segs[to + 1].kanji && KANA_GLUE.test(segs[to + 1].text) && segs[to + 2].kanji) to += 2
+    while (to + 2 < segs.length && !segs[to + 1].kanji && KANA_GLUE_LOOSE.test(segs[to + 1].text) && segs[to + 2].kanji) to += 2
     const part = segs.slice(i, to + 1)
     // 읽기가 빠진 한자가 있으면 빈칸으로 쓰지 않아요 (보통 모드에서 히라가나 정답을 알 수 없어서)
     if (part.some((g) => g.kanji && !g.reading)) {
@@ -94,14 +96,18 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
     for (let c = start; c < end; c++) covered[c] = true
     cands.push({ start, end, text: u.text, reading: u.reading, score: 300 + (words.some((w) => w.includes(u.text) || u.text.includes(w)) ? 100 : 0) + u.text.length * 10 + h(u.text, k) })
   })
-  // 읽기가 빠진 한자도 빈칸으로 쓸 수 있게 (보통 모드에선 한자로만 정답)
-  segs.forEach((g, i) => {
-    if (!g.kanji || g.reading) return
+  // 읽기가 빠진 한자도 빈칸으로 써요 (飛び方처럼 이어진 덩어리째, 보통 모드에선 한자로만 정답)
+  for (let i = 0; i < segs.length; i++) {
+    if (!segs[i].kanji || covered[offs[i]]) continue
+    let to = i
+    while (to + 2 < segs.length && !segs[to + 1].kanji && KANA_GLUE_LOOSE.test(segs[to + 1].text) && segs[to + 2].kanji && !covered[offs[to + 2]]) to += 2
     const start = offs[i]
-    if (covered[start]) return
-    for (let c = start; c < start + g.text.length; c++) covered[c] = true
-    cands.push({ start, end: start + g.text.length, text: g.text, reading: '', score: 150 + g.text.length * 10 + h(g.text, i) })
-  })
+    const end = offs[to] + segs[to].text.length
+    for (let c = start; c < end; c++) covered[c] = true
+    const t = text.slice(start, end)
+    cands.push({ start, end, text: t, reading: '', score: 150 + Array.from(t).length * 10 + h(t, i) })
+    i = to
+  }
   wordUnits(text).forEach((u, k) => {
     for (let c = u.start; c < u.end; c++) if (covered[c]) return
     const base = u.kind === 'kata' ? 200 : u.kind === 'hira' ? 100 : 50
@@ -116,7 +122,7 @@ export function blanksFor(song: Song, lineIndex: number): BlankLine {
   if (!cands.length) return { parts: [{ text }], answers: [] }
   // 문장 길이에 따라 1~3개
   const len = Array.from(text.replace(/\s/g, '')).length
-  const want = Math.min(cands.length, len >= 18 ? 3 : len >= 9 ? 2 : 1)
+  const want = Math.min(cands.length, len >= 16 ? 3 : len >= 6 ? 2 : 1)
   const picked = [...cands].sort((a, b) => b.score - a.score).slice(0, want).sort((a, b) => a.start - b.start)
   const parts: BlankPart[] = []
   let pos = 0
@@ -152,8 +158,9 @@ export function choicesFor(song: Song, lineIndex: number, blank: number) {
   const kind = (t: string) => (/^[A-Za-z']+$/.test(t) ? 'latin' : /[\u3400-\u9FFF々]/.test(t) ? 'kanji' : 'kana')
   const want = kind(answer)
   song.lines.forEach((_, i) => candidates(song, i, song.lines[i].ruby).cands.forEach((c) => { if (kind(c.text) === want) pool.add(c.text) }))
-  // 같은 문장의 다른 빈칸 정답은 보기에서 빼요 (헷갈리지 않게)
-  all.forEach((a) => pool.delete(a.text))
+  // 같은 문장의 다른 빈칸 정답은 보기에서 빼요 (헷갈리지 않게, 영어는 대소문자 무시)
+  const same = new Set(all.map((a) => a.text.toLowerCase()))
+  for (const t of [...pool]) if (same.has(t.toLowerCase())) pool.delete(t)
   const seed = hash(`${song.id}:${lineIndex}:${blank}`)
   const ranked = [...pool].sort((a, b) => {
     const da = Math.abs(a.length - answer.length)
@@ -163,7 +170,7 @@ export function choicesFor(song: Song, lineIndex: number, blank: number) {
   const picks = ranked.slice(0, 3)
   for (const f of latin ? FALLBACK_LATIN : kanaMode ? FALLBACK_KANA : FALLBACK) {
     if (picks.length >= 3) break
-    if (f !== answer && !picks.includes(f) && !all.some((a) => a.text === f)) picks.push(f)
+    if (!same.has(f.toLowerCase()) && !picks.includes(f)) picks.push(f)
   }
   // 보기 순서도 항상 같게 섞어요
   return [answer, ...picks].sort((a, b) => (hash(a + seed + 'o') % 1009) - (hash(b + seed + 'o') % 1009))
