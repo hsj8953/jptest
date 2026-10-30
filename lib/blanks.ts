@@ -1,9 +1,9 @@
 // 쉬움·보통 난이도의 빈칸 만들기
 // - 빈칸은 한자 단어 위주 (단어장에 있는 단어를 먼저), 한자가 없는 문장은 가타카나·히라가나 단어
-// - 문장마다 1개, 한자가 많고 긴 문장은 2개
+// - 한자 → 가타카나 → 히라가나 → 영어 순으로, 문장 길이에 따라 1~3개
 // - 같은 곡이면 누가 언제 열어도 항상 같은 빈칸이 나와요
 
-import { answerOf, normalizeAnswer, normalizeKanji, splitRuby } from './ruby'
+import { normalizeAnswer, normalizeKanji, splitRuby } from './ruby'
 import type { Difficulty, Song } from './types'
 
 export type BlankPart = { text: string; blank?: number }
@@ -43,39 +43,81 @@ function units(ruby: string) {
   return { segs, units: out }
 }
 
-// 한자가 없는 문장용: 조사·어미처럼 너무 짧거나 빈칸으로 의미 없는 말은 빼요
-const SKIP_KANA = new Set(['から', 'まで', 'より', 'です', 'ます', 'でも', 'けど', 'ので', 'のに', 'だけ', 'ほど', 'など', 'って', 'だよ', 'だね', 'よね', 'かな', 'ない', 'いる', 'ある', 'する', 'なる', 'この', 'その', 'あの', 'それ', 'これ', 'あれ'])
+// 빈칸으로 의미 없는 짧은 말(조사·어미·지시어)은 빼요
+const SKIP_KANA = new Set(['から', 'まで', 'より', 'です', 'ます', 'でも', 'けど', 'ので', 'のに', 'だけ', 'ほど', 'など', 'って', 'だよ', 'だね', 'よね', 'かな', 'ない', 'いる', 'ある', 'する', 'なる', 'この', 'その', 'あの', 'それ', 'これ', 'あれ', 'なら', 'たい', 'たら', 'だろう', 'でしょう', 'んだ', 'のよ', 'のね', 'ても', 'では', 'には', 'とは', 'ねえ', 'ため'])
 const KATA = /[\u30A0-\u30FF]/
+const KANJI_CH = /[\u3400-\u9FFF々〆]/
+const KANA_WORD = /^[\u3041-\u309F\u30A0-\u30FFー]+$/
+const LATIN_WORD = /^[A-Za-z][A-Za-z']+$/
+const SKIP_LATIN = new Set(['the', 'and', 'you', 'are', 'for', 'but', 'not', 'yeah', 'its', "it's"])
 
-/** 한자가 없는 문장의 빈칸 후보: 가타카나 단어 먼저, 없으면 두 글자 이상 히라가나 단어 */
-function kanaUnits(text: string) {
-  type U = { start: number; end: number; text: string }
-  const out: U[] = []
-  const Seg = (Intl as unknown as { Segmenter?: new (l: string, o: { granularity: string }) => { segment: (t: string) => Iterable<{ segment: string; index: number; isWordLike?: boolean }> } }).Segmenter
-  if (Seg) {
-    for (const w of new Seg('ja', { granularity: 'word' }).segment(text)) {
-      if (!w.isWordLike) continue
-      const t = w.segment
-      if (Array.from(t).length < 2 || SKIP_KANA.has(t) || !/^[\u3041-\u309F\u30A0-\u30FFー]+$/.test(t)) continue
-      out.push({ start: w.index, end: w.index + t.length, text: t })
+type Seg = { segment: string; index: number; isWordLike?: boolean }
+const Segmenter = (Intl as unknown as { Segmenter?: new (l: string, o: { granularity: string }) => { segment: (t: string) => Iterable<Seg> } }).Segmenter
+
+/** 가나·영어 단어 후보 (한자 옆에 붙은 오쿠리가나 조각은 빼요) */
+function wordUnits(text: string) {
+  const out: { start: number; end: number; text: string; kind: 'kata' | 'hira' | 'latin' }[] = []
+  const push = (start: number, t: string) => {
+    const end = start + t.length
+    if (KANA_WORD.test(t)) {
+      if (Array.from(t).length < 2 || SKIP_KANA.has(t)) return
+      // 会いたい의 いたい처럼 한자 바로 뒤에 붙은 히라가나는 단어가 아니라 어미예요
+      if (!KATA.test(t) && start > 0 && KANJI_CH.test(text[start - 1])) return
+      out.push({ start, end, text: t, kind: KATA.test(t) ? 'kata' : 'hira' })
+    } else if (LATIN_WORD.test(t) && t.length >= 3 && !SKIP_LATIN.has(t.toLowerCase())) {
+      out.push({ start, end, text: t, kind: 'latin' })
     }
+  }
+  if (Segmenter) {
+    for (const w of new Segmenter('ja', { granularity: 'word' }).segment(text)) if (w.isWordLike !== false) push(w.index, w.segment)
   } else {
-    // 단어 나누기를 못 쓰는 오래된 브라우저: 가타카나 덩어리만
-    for (const m of text.matchAll(/[\u30A0-\u30FFー]{2,}/g)) out.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, text: m[0] })
+    for (const m of text.matchAll(/[\u30A0-\u30FFー]{2,}|[A-Za-z']{3,}/g)) push(m.index ?? 0, m[0])
   }
   return out
 }
 
-function kanaBlanks(song: Song, lineIndex: number, text: string): BlankLine {
-  const us = kanaUnits(text)
-  if (!us.length) return { parts: [{ text }], answers: [] }
-  const want = us.length >= 3 && Array.from(text).length >= 12 ? 2 : 1
-  const picked = us
-    .map((u, k) => ({ u, k, score: (KATA.test(u.text) ? 100 : 0) + Array.from(u.text).length * 10 + (hash(`${song.id}:${lineIndex}:${u.text}:${k}`) % 10) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, want)
-    .sort((a, b) => a.k - b.k)
-    .map((x) => x.u)
+type Cand = { start: number; end: number; text: string; reading: string; score: number }
+
+/** 한 문장의 빈칸 후보 전부 (한자 단어 + 가나 단어 + 영어 단어) */
+function candidates(song: Song, lineIndex: number, ruby: string) {
+  const { segs, units: ku } = units(ruby)
+  const offs: number[] = []
+  let text = ''
+  segs.forEach((g) => { offs.push(text.length); text += g.text })
+  const words = (song.words ?? []).map((w) => w.word)
+  const h = (t: string, k: number) => hash(`${song.id}:${lineIndex}:${t}:${k}`) % 10
+  const cands: Cand[] = []
+  const covered = new Array(text.length).fill(false)
+  ku.forEach((u, k) => {
+    const start = offs[u.from]
+    const end = offs[u.to] + segs[u.to].text.length
+    for (let c = start; c < end; c++) covered[c] = true
+    cands.push({ start, end, text: u.text, reading: u.reading, score: 300 + (words.some((w) => w.includes(u.text) || u.text.includes(w)) ? 100 : 0) + u.text.length * 10 + h(u.text, k) })
+  })
+  // 읽기가 빠진 한자도 빈칸으로 쓸 수 있게 (보통 모드에선 한자로만 정답)
+  segs.forEach((g, i) => {
+    if (!g.kanji || g.reading) return
+    const start = offs[i]
+    if (covered[start]) return
+    for (let c = start; c < start + g.text.length; c++) covered[c] = true
+    cands.push({ start, end: start + g.text.length, text: g.text, reading: '', score: 150 + g.text.length * 10 + h(g.text, i) })
+  })
+  wordUnits(text).forEach((u, k) => {
+    for (let c = u.start; c < u.end; c++) if (covered[c]) return
+    const base = u.kind === 'kata' ? 200 : u.kind === 'hira' ? 100 : 50
+    cands.push({ start: u.start, end: u.end, text: u.text, reading: u.kind === 'latin' ? '' : toHiraStr(u.text), score: base + Array.from(u.text).length * 10 + h(u.text, k) })
+  })
+  return { text, cands }
+}
+
+export function blanksFor(song: Song, lineIndex: number): BlankLine {
+  const ruby = song.lines[lineIndex]?.ruby ?? ''
+  const { text, cands } = candidates(song, lineIndex, ruby)
+  if (!cands.length) return { parts: [{ text }], answers: [] }
+  // 문장 길이에 따라 1~3개
+  const len = Array.from(text.replace(/\s/g, '')).length
+  const want = Math.min(cands.length, len >= 18 ? 3 : len >= 9 ? 2 : 1)
+  const picked = [...cands].sort((a, b) => b.score - a.score).slice(0, want).sort((a, b) => a.start - b.start)
   const parts: BlankPart[] = []
   let pos = 0
   picked.forEach((u, n) => {
@@ -84,40 +126,6 @@ function kanaBlanks(song: Song, lineIndex: number, text: string): BlankLine {
     pos = u.end
   })
   if (pos < text.length) parts.push({ text: text.slice(pos) })
-  return { parts, answers: picked.map((u) => ({ text: u.text, reading: toHiraStr(u.text) })) }
-}
-
-export function blanksFor(song: Song, lineIndex: number): BlankLine {
-  const line = song.lines[lineIndex]
-  const { segs, units: us } = units(line?.ruby ?? '')
-  // 한자가 없는 문장은 가나 단어로 빈칸을 만들어요
-  if (!us.length) return kanaBlanks(song, lineIndex, answerOf(line?.ruby ?? ''))
-  const words = (song.words ?? []).map((w) => w.word)
-  const len = answerOf(line.ruby).length
-  const want = us.length >= 3 && len >= 12 ? 2 : 1
-  const picked = us
-    .map((u, k) => ({
-      u,
-      k,
-      score: (words.some((w) => w.includes(u.text) || u.text.includes(w)) ? 100 : 0) + u.text.length * 10 + (hash(`${song.id}:${lineIndex}:${u.text}`) % 10),
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, want)
-    .sort((a, b) => a.k - b.k)
-    .map((x) => x.u)
-
-  const parts: BlankPart[] = []
-  let buf = ''
-  let i = 0
-  picked.forEach((u, n) => {
-    while (i < u.from) buf += segs[i++].text
-    if (buf) parts.push({ text: buf })
-    buf = ''
-    parts.push({ text: u.text, blank: n })
-    i = u.to + 1
-  })
-  while (i < segs.length) buf += segs[i++].text
-  if (buf) parts.push({ text: buf })
   return { parts, answers: picked.map((u) => ({ text: u.text, reading: u.reading })) }
 }
 
@@ -129,6 +137,8 @@ export function gradedLines(song: Song, d: Difficulty) {
 const toHiraStr = (s: string) => s.replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
 const FALLBACK_KANA = ['さよなら', 'ありがとう', 'メロディ', 'いつか', 'きっと', 'ずっと', 'どこか', 'もう一度', 'ひとり', 'ふたり']
 
+const FALLBACK_LATIN = ['love', 'dream', 'heart', 'baby', 'forever', 'tonight', 'smile', 'shine']
+
 const FALLBACK = ['心', '夢', '空', '花', '雨', '光', '声', '涙', '時間', '世界', '明日', '未来', '季節', '言葉', '景色']
 
 /** 쉬움 모드 보기 4개 (정답 + 같은 곡의 다른 한자 단어) */
@@ -138,10 +148,10 @@ export function choicesFor(song: Song, lineIndex: number, blank: number) {
   // 한자 빈칸이면 한자 단어끼리, 가나 빈칸이면 가나 단어끼리 섞어요
   const kanaMode = !/[\u3400-\u9FFF々]/.test(answer)
   const pool = new Set<string>()
-  song.lines.forEach((l) => {
-    if (kanaMode) kanaUnits(answerOf(l.ruby)).forEach((u) => pool.add(u.text))
-    else units(l.ruby).units.forEach((u) => pool.add(u.text))
-  })
+  const latin = /^[A-Za-z']+$/.test(answer)
+  const kind = (t: string) => (/^[A-Za-z']+$/.test(t) ? 'latin' : /[\u3400-\u9FFF々]/.test(t) ? 'kanji' : 'kana')
+  const want = kind(answer)
+  song.lines.forEach((_, i) => candidates(song, i, song.lines[i].ruby).cands.forEach((c) => { if (kind(c.text) === want) pool.add(c.text) }))
   // 같은 문장의 다른 빈칸 정답은 보기에서 빼요 (헷갈리지 않게)
   all.forEach((a) => pool.delete(a.text))
   const seed = hash(`${song.id}:${lineIndex}:${blank}`)
@@ -151,7 +161,7 @@ export function choicesFor(song: Song, lineIndex: number, blank: number) {
     return da - db || (hash(a + seed) % 997) - (hash(b + seed) % 997)
   })
   const picks = ranked.slice(0, 3)
-  for (const f of kanaMode ? FALLBACK_KANA : FALLBACK) {
+  for (const f of latin ? FALLBACK_LATIN : kanaMode ? FALLBACK_KANA : FALLBACK) {
     if (picks.length >= 3) break
     if (f !== answer && !picks.includes(f) && !all.some((a) => a.text === f)) picks.push(f)
   }
@@ -165,5 +175,7 @@ const toHira = (s: string) => s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode
 export function blankCorrect(input: string, ans: { text: string; reading: string }) {
   const v = normalizeAnswer(input).replace(/\s+/g, '')
   if (!v) return false
-  return v === normalizeAnswer(ans.text) || toHira(v) === toHira(ans.reading)
+  const t = normalizeAnswer(ans.text).replace(/\s+/g, '')
+  if (v.toLowerCase() === t.toLowerCase()) return true
+  return !!ans.reading && toHira(v) === toHira(ans.reading)
 }
