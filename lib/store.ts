@@ -5,6 +5,7 @@
 //   songs/{songId}                 곡 정보 · 문장 · 타이밍
 //   songs/{songId}/scores/{uid}    친구별 점수 (모두가 봄)
 //   users/{uid}/progress/{songId}  내 진도 · 내가 쓴 답 (나만 봄)
+//   users/{uid}/meta/profile       내 닉네임 (친구들 기록에는 이 이름이 보여요)
 
 import { useSyncExternalStore } from 'react'
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
@@ -169,6 +170,15 @@ export function countCorrect(p: SongProgress | undefined, total: number) {
   return n
 }
 
+/** 저장해 둔 닉네임 (없으면 null) */
+export async function loadNickname(uid: string) {
+  const snap = await getDoc(doc(getDb(), 'users', uid, 'meta', 'profile'))
+  const n = snap.exists() ? String(snap.data().nickname ?? '').trim() : ''
+  return n || null
+}
+
+export const NICK_MAX = 12
+
 export const newSongId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 
 export const actions = {
@@ -204,6 +214,21 @@ export const actions = {
     if (!me) return
     set({ vocab: { words: { ...state.vocab.words, ...(patch.words ?? {}) }, kana: { ...state.vocab.kana, ...(patch.kana ?? {}) } } })
     await setDoc(doc(getDb(), 'users', me.uid, 'meta', 'vocab'), { ...patch, updatedAt: serverTimestamp() }, { merge: true })
+  },
+  /** 닉네임 저장 + 이미 남긴 친구 기록의 이름도 바꿔요 */
+  async setNickname(uid: string, nickname: string) {
+    const name = nickname.trim().slice(0, NICK_MAX)
+    const db = getDb()
+    await setDoc(doc(db, 'users', uid, 'meta', 'profile'), { nickname: name, updatedAt: serverTimestamp() }, { merge: true })
+    if (me && me.uid === uid) me = { ...me, name }
+    const songs = await getDocs(collection(db, 'songs'))
+    await Promise.all(
+      songs.docs.map(async (sd) => {
+        const ref = doc(db, 'songs', sd.id, 'scores', uid)
+        if ((await getDoc(ref)).exists()) await setDoc(ref, { name }, { merge: true })
+      }),
+    )
+    return name
   },
   async setInvites(emails: string[]) {
     await setDoc(doc(getDb(), 'config', 'access'), { emails })

@@ -11,7 +11,8 @@ import { Invite } from '@/components/kakitori/invite'
 import { Vocab } from '@/components/kakitori/vocab'
 import { Login, NotInvited, SetupNeeded } from '@/components/kakitori/login'
 import { ADMIN_EMAIL, firebaseConfigured, getFirebaseAuth, googleProvider } from '@/lib/firebase'
-import { isInvited, startSync, stopSync, useStore } from '@/lib/store'
+import { actions, isInvited, loadNickname, startSync, stopSync, useStore } from '@/lib/store'
+import { NicknameForm } from '@/components/kakitori/nickname'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
 
@@ -68,6 +69,7 @@ function useDarkMode() {
 
 export default function Page() {
   const [auth, setAuth] = useState<AuthState>('loading')
+  const [nickOpen, setNickOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
@@ -132,9 +134,17 @@ export default function Page() {
         setAuth('not-invited')
         return
       }
-      const me: User = { uid: u.uid, name: u.displayName || em.split('@')[0] || '친구', email: em, isAdmin }
+      // 친구들 기록에는 구글 이름 대신 직접 정한 닉네임이 보여요
+      let nick: string | null = null
+      try {
+        nick = await loadNickname(u.uid)
+      } catch {
+        nick = null
+      }
+      const me: User = { uid: u.uid, name: nick ?? '', email: em, isAdmin }
       setUser(me)
-      startSync(me)
+      setNickOpen(!nick)
+      if (nick) startSync(me)
       setAuth('in')
     })
   }, [])
@@ -168,6 +178,23 @@ export default function Page() {
   if (auth === 'out') return <Login onLogin={login} busy={loginBusy} error={loginError} />
   if (auth === 'not-invited') return <NotInvited email={email} onLogout={logout} />
   if (!user) return null
+  if (nickOpen) {
+    const first = !user.name
+    return (
+      <NicknameForm
+        initial={user.name}
+        first={first}
+        onCancel={first ? logout : () => setNickOpen(false)}
+        onSave={async (n) => {
+          const name = await actions.setNickname(user.uid, n)
+          const next = { ...user, name }
+          setUser(next)
+          if (first) startSync(next)
+          setNickOpen(false)
+        }}
+      />
+    )
+  }
 
   const isAdmin = user.isAdmin
   const selected = songs.find((s) => s.id === selectedId)
@@ -217,7 +244,7 @@ export default function Page() {
 
   return (
     <div className="app-paper min-h-screen">
-      <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} />
+      <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} onNickname={() => setNickOpen(true)} />
       {body}
     </div>
   )

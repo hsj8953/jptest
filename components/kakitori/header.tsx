@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, LogOut, Menu, Moon, Sun, X } from 'lucide-react'
+import { BookOpen, LogOut, Menu, Moon, Pencil, Sun, X } from 'lucide-react'
 import type { User } from '@/lib/types'
 
-export function Header({ user, dark, onHome, onDark, onLogout }: { user: User; dark: boolean; onHome: () => void; onDark: () => void; onLogout: () => void }) {
+export function Header({ user, dark, onHome, onDark, onLogout, onNickname }: { user: User; dark: boolean; onHome: () => void; onDark: () => void; onLogout: () => void; onNickname: () => void }) {
   const [open, setOpen] = useState(false)
   const initial = user.name.slice(0, 1)
   return (
@@ -23,9 +23,9 @@ export function Header({ user, dark, onHome, onDark, onLogout }: { user: User; d
           </button>
           <div className="hidden items-center gap-2 border-l border-border pl-3 sm:flex">
             <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">{initial}</span>
-            <span className="text-sm">
+            <button onClick={onNickname} title="닉네임 바꾸기" className="rounded-md text-sm hover:text-primary">
               {user.name} {user.isAdmin && <span className="text-xs text-primary">관리자</span>}
-            </span>
+            </button>
             <button onClick={onLogout} className="ml-1 text-muted-foreground hover:text-foreground" aria-label="로그아웃">
               <LogOut className="size-4" />
             </button>
@@ -42,9 +42,14 @@ export function Header({ user, dark, onHome, onDark, onLogout }: { user: User; d
               <span className="grid size-8 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">{initial}</span>
               {user.name} {user.isAdmin && <span className="text-xs text-primary">관리자</span>}
             </span>
-            <button onClick={() => { setOpen(false); onLogout() }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
-              <LogOut className="size-4" />로그아웃
-            </button>
+            <span className="flex items-center">
+              <button onClick={() => { setOpen(false); onNickname() }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+                <Pencil className="size-4" />닉네임
+              </button>
+              <button onClick={() => { setOpen(false); onLogout() }} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+                <LogOut className="size-4" />로그아웃
+              </button>
+            </span>
           </div>
         </div>
       )}
