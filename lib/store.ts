@@ -9,7 +9,7 @@
 import { useSyncExternalStore } from 'react'
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
 import { getDb } from './firebase'
-import type { Song, SongProgress, User, VocabProgress } from './types'
+import type { Difficulty, Song, SongProgress, User, VocabProgress } from './types'
 
 type State = {
   ready: boolean
@@ -124,15 +124,42 @@ export async function isInvited(email: string) {
   return emails.includes(email.toLowerCase())
 }
 
-export type Score = { uid: string; name: string; ok: number; total: number }
+type Pair = { ok: number; total: number }
+/** 친구 점수: ok·total 은 어려움, easy·normal 은 해당 난이도 */
+export type Score = { uid: string; name: string; ok: number; total: number; easy?: Pair; normal?: Pair }
+
+/** 진도 문서 이름: 어려움은 곡 ID 그대로(예전 기록과 호환), 쉬움·보통은 뒤에 붙여요 */
+export const progKey = (songId: string, d: Difficulty) => (d === 'hard' ? songId : `${songId}__${d}`)
+export function parseProgKey(key: string): { songId: string; d: Difficulty } {
+  const m = key.match(/^(.*)__(easy|normal)$/)
+  return m ? { songId: m[1], d: m[2] as Difficulty } : { songId: key, d: 'hard' }
+}
+/** 점수 문서에서 난이도별 점수 꺼내기 */
+export function scoreFor(sc: Score, d: Difficulty): Pair | null {
+  if (d === 'hard') return sc.total ? { ok: sc.ok, total: sc.total } : null
+  return sc[d] ?? null
+}
 
 /** 이 곡의 친구들 점수를 실시간으로 받아요 */
 export function watchScores(songId: string, cb: (scores: Score[]) => void) {
   return onSnapshot(
     collection(getDb(), 'songs', songId, 'scores'),
-    (snap) => cb(snap.docs.map((d) => ({ uid: d.id, name: String(d.data().name ?? '친구'), ok: Number(d.data().ok ?? 0), total: Number(d.data().total ?? 0) }))),
+    (snap) =>
+      cb(
+        snap.docs.map((d) => {
+          const x = d.data()
+          const pair = (v: unknown): Pair | undefined => (v && typeof v === 'object' ? { ok: Number((v as Pair).ok ?? 0), total: Number((v as Pair).total ?? 0) } : undefined)
+          return { uid: d.id, name: String(x.name ?? '친구'), ok: Number(x.ok ?? 0), total: Number(x.total ?? 0), easy: pair(x.easy), normal: pair(x.normal) }
+        }),
+      ),
     () => cb([]),
   )
+}
+
+/** 지정한 문장들 중 맞힌 개수 */
+export function countCorrectIn(p: SongProgress | undefined, lines: number[]) {
+  if (!p) return 0
+  return lines.filter((i) => p[i]?.ok).length
 }
 
 export function countCorrect(p: SongProgress | undefined, total: number) {
@@ -157,15 +184,20 @@ export const actions = {
     await Promise.all(scores.docs.map((d) => deleteDoc(d.ref)))
     await deleteDoc(doc(db, 'songs', id))
   },
-  async saveProgress(songId: string, p: SongProgress) {
+  /** 진도 저장. graded 는 이 난이도에서 채점하는 문장 번호들 */
+  async saveProgress(songId: string, p: SongProgress, d: Difficulty = 'hard', graded?: number[]) {
     if (!me) return
     const db = getDb()
-    const total = state.songs.find((s) => s.id === songId)?.lines.length ?? 0
+    const key = progKey(songId, d)
+    const lines = graded ?? Array.from({ length: state.songs.find((s) => s.id === songId)?.lines.length ?? 0 }, (_, i) => i)
+    const ok = lines.filter((i) => p[i]?.ok).length
+    const total = lines.length
     // 화면이 바로 바뀌도록 먼저 반영
     const now = Date.now()
-    set({ progress: { ...state.progress, [songId]: p }, touched: { ...state.touched, [songId]: now } })
-    await setDoc(doc(db, 'users', me.uid, 'progress', songId), { lines: p, touchedAt: now, updatedAt: serverTimestamp() })
-    await setDoc(doc(db, 'songs', songId, 'scores', me.uid), { name: me.name, ok: countCorrect(p, total), total, updatedAt: serverTimestamp() })
+    set({ progress: { ...state.progress, [key]: p }, touched: { ...state.touched, [key]: now } })
+    await setDoc(doc(db, 'users', me.uid, 'progress', key), { lines: p, touchedAt: now, updatedAt: serverTimestamp() })
+    const score = d === 'hard' ? { ok, total } : { [d]: { ok, total } }
+    await setDoc(doc(db, 'songs', songId, 'scores', me.uid), { name: me.name, ...score, updatedAt: serverTimestamp() }, { merge: true })
   },
   /** 단어장 진도 저장. 바뀐 항목만 넘기면 돼요. 예: { words: { '夜空|よぞら': 2 } } */
   async saveVocab(patch: Partial<VocabProgress>) {

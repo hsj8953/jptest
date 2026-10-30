@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Trophy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { actions, countCorrect, useStore, watchScores, type Score } from '@/lib/store'
+import { actions, countCorrectIn, progKey, scoreFor, useStore, watchScores, type Score } from '@/lib/store'
 import { answerOf, normalizeAnswer, normalizeKanji } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
-import type { Song, User } from '@/lib/types'
+import { DIFFICULTY_LABEL, type Difficulty, type Song, type User } from '@/lib/types'
+import { gradedLines } from '@/lib/blanks'
+import { BlankCard, ListenOnlyCard } from './blank-card'
+import { BlankResults } from './blank-results'
 import { BackButton, Furigana, ProgressBar } from './furigana'
 import { themeStyle, useSongHue } from '@/lib/theme'
 import { Results } from './results'
@@ -16,15 +19,24 @@ type Result = { ok: boolean; input: string; revealed: boolean }
 
 const HINT_KEY = 'kakitori.hint.listen.v1'
 
-export function Study({ song, user, onBack, initialLine }: { song: Song; user: User; onBack: () => void; initialLine?: number | null }) {
+export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty }: {
+  song: Song
+  user: User
+  onBack: () => void
+  initialLine?: number | null
+  difficulty?: Difficulty
+  onChangeDifficulty?: () => void
+}) {
   const { progress } = useStore()
-  const prog = progress[song.id] ?? {}
+  const prog = progress[progKey(song.id, difficulty)] ?? {}
   const L = song.lines
   const total = L.length
+  // 이 난이도에서 채점하는 문장 (쉬움·보통은 빈칸이 있는 문장만)
+  const graded = useMemo(() => gradedLines(song, difficulty), [song, difficulty])
+  const isGraded = (k: number) => graded.includes(k)
   const [current, setCurrent] = useState(() => {
     if (initialLine != null && initialLine >= 0 && initialLine < total) return initialLine
-    const first = L.findIndex((_, k) => !prog[k]?.ok)
-    return first < 0 ? 0 : first
+    return graded.find((k) => !prog[k]?.ok) ?? graded[0] ?? 0
   })
   const [answer, setAnswer] = useState('')
   const [translation, setTranslation] = useState('')
@@ -93,13 +105,36 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
   }
 
   const attempted = (k: number) => !!(prog[k]?.tries || prog[k]?.revealed)
-  const allDone = L.every((_, k) => attempted(k))
-  const firstUndone = Math.max(0, L.findIndex((_, k) => !attempted(k)))
+  const allDone = graded.length > 0 && graded.every((k) => attempted(k))
+  const firstUndone = graded.find((k) => !attempted(k)) ?? 0
   const openResults = () => {
     drafts.current[current] = { answer, translation }
     yt.stop()
     setShowResults(true)
     window.scrollTo(0, 0)
+  }
+
+  const reviewAt = (k: number) => {
+    const d = drafts.current[k]
+    setAnswer(d?.answer ?? '')
+    setTranslation(d?.translation ?? '')
+    setResult(null)
+    setCurrent(k)
+    setShowResults(false)
+    window.scrollTo(0, 0)
+  }
+  const restartAll = () => {
+    actions.saveProgress(song.id, {}, difficulty, graded).catch(() => {})
+    drafts.current = {}
+    setAnswer('')
+    setTranslation('')
+    setResult(null)
+    setCurrent(graded[0] ?? 0)
+    setShowResults(false)
+  }
+
+  if (showResults && difficulty !== 'hard') {
+    return <BlankResults song={song} progress={prog} mode={difficulty} graded={graded} onBack={onBack} onReview={reviewAt} onRestart={restartAll} />
   }
 
   if (showResults) {
@@ -118,7 +153,7 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
           window.scrollTo(0, 0)
         }}
         onRestart={() => {
-          actions.saveProgress(song.id, {}).catch(() => {})
+          actions.saveProgress(song.id, {}, difficulty, graded).catch(() => {})
           drafts.current = {}
           setAnswer('')
           setTranslation('')
@@ -132,14 +167,14 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
 
   const sentence = L[current]
   const p = prog[current] ?? {}
-  const okCount = countCorrect(prog, total)
+  const okCount = countCorrectIn(prog, graded)
   const endOf = (k: number) => L.slice(k + 1).find((l) => l.start != null)?.start ?? yt.duration ?? (L[k].start ?? 0) + 8
   const canPlay = !!song.youtubeId && yt.ready && sentence.start != null
   segRef.current = { start: sentence.start, end: () => endOf(current), loop: repeat }
 
   const save = (next: typeof prog) => {
     setSaveError('')
-    actions.saveProgress(song.id, next).catch(() => setSaveError('기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
+    actions.saveProgress(song.id, next, difficulty, graded).catch(() => setSaveError('기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
   }
 
   const move = (k: number) => {
@@ -177,6 +212,21 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
     setResult(null)
     setTimeout(() => answerRef.current?.focus(), 0)
   }
+
+  const isLast = current === total - 1
+  const nextButton = isLast && allDone ? (
+    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
+  ) : isLast ? (
+    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(firstUndone)}>안 푼 문장으로<ChevronRight data-icon="inline-end" /></Button>
+  ) : (
+    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(current + 1)}>다음 문장<ChevronRight data-icon="inline-end" /></Button>
+  )
+  const navButtons = (ok: boolean, retryFn: () => void) => (
+    <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+      {!ok && <Button variant="outline" className="h-12 w-full text-base sm:h-10 sm:w-auto sm:text-sm" onClick={retryFn}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
+      {nextButton}
+    </div>
+  )
 
   return (
     <main className="study-page song-theme mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10" style={themeStyle(theme)}>
@@ -246,11 +296,21 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
           <div className="mt-8 flex items-end justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-xs font-semibold uppercase tracking-widest text-primary"><span className="font-jp">{song.title}</span></p>
-              <h1 className="mt-2 text-2xl font-bold">문장 {current + 1} <span className="font-normal text-muted-foreground">/ {total} · 정답 {okCount}</span></h1>
+              <h1 className="mt-2 text-2xl font-bold">문장 {current + 1} <span className="font-normal text-muted-foreground">/ {total} · 정답 {okCount}/{graded.length}</span></h1>
             </div>
-            <span className="shrink-0 text-sm text-muted-foreground">시도 {p.tries ?? 0}회</span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button
+                onClick={onChangeDifficulty}
+                className="inline-flex h-8 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary transition hover:bg-primary/15"
+                title="난이도 바꾸기"
+              >
+                {DIFFICULTY_LABEL[difficulty]} · 바꾸기
+              </button>
+              <span className="text-sm text-muted-foreground">시도 {p.tries ?? 0}회</span>
+            </div>
           </div>
 
+          {difficulty === 'hard' ? (
           <div className="mt-5 rounded-2xl border border-border bg-card p-4 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기 <span className="font-normal text-destructive">*</span></label>
@@ -340,18 +400,24 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
                 <button onClick={reveal} className="h-11 rounded-lg px-4 text-sm text-muted-foreground hover:bg-muted sm:h-10">모르겠어요 · 정답 보기</button>
               </div>
             ) : (
-              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                {!result.ok && <Button variant="outline" className="h-12 w-full text-base sm:h-10 sm:w-auto sm:text-sm" onClick={retry}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
-                {current === total - 1 && allDone ? (
-                  <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
-                ) : current === total - 1 ? (
-                  <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(firstUndone)}>안 푼 문장으로<ChevronRight data-icon="inline-end" /></Button>
-                ) : (
-                  <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(current + 1)}>다음 문장<ChevronRight data-icon="inline-end" /></Button>
-                )}
-              </div>
+              navButtons(result.ok, retry)
             )}
           </div>
+          ) : isGraded(current) ? (
+            <BlankCard
+              key={`${difficulty}-${current}-${p.tries ?? 0}-${p.revealed ? 1 : 0}`}
+              song={song}
+              lineIndex={current}
+              mode={difficulty}
+              prev={p}
+              onGrade={(ok, answers, ko) => save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, blanks: answers, translation: ko } })}
+              onReveal={(ko) => save({ ...prog, [current]: { ...p, revealed: true, translation: ko || p.translation } })}
+              nav={(g, retryFn) => navButtons(!!g?.ok, retryFn)}
+            />
+          ) : (
+            <ListenOnlyCard song={song} lineIndex={current} nav={<div className="mt-5 flex flex-col gap-2 sm:flex-row">{nextButton}</div>} />
+          )}
+          {saveError && difficulty !== 'hard' && <p className="mt-3 text-xs text-destructive">{saveError}</p>}
 
           <div className="mt-4 flex justify-between">
             <button onClick={() => move(current - 1)} disabled={current === 0} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted disabled:opacity-40"><ChevronLeft className="size-4" />이전 문장</button>
@@ -368,7 +434,11 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
             <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 lg:grid-cols-5">
               {L.map((_, i) => {
                 const st = prog[i]
-                const tone = i === current
+                const tone = !isGraded(i)
+                  ? i === current
+                    ? 'border-primary border-dashed text-primary ring-2 ring-primary/30'
+                    : 'border-dashed border-border text-muted-foreground/60 hover:bg-muted'
+                  : i === current
                   ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
                   : st?.ok
                     ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60'
@@ -376,7 +446,7 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
                       ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/60'
                       : 'border-border text-muted-foreground hover:border-primary/50 hover:bg-muted hover:text-foreground'
                 return (
-                  <button key={i} onClick={() => move(i)} className={`grid aspect-square place-items-center rounded-lg border text-sm font-semibold transition hover:-translate-y-px ${tone}`} aria-label={`${i + 1}번 문장`} aria-current={i === current}>
+                  <button key={i} onClick={() => move(i)} className={`grid aspect-square place-items-center rounded-lg border text-sm font-semibold transition hover:-translate-y-px ${tone}`} aria-label={`${i + 1}번 문장${isGraded(i) ? '' : ' (빈칸 없음)'}`} aria-current={i === current}>
                     {i + 1}
                   </button>
                 )
@@ -385,29 +455,33 @@ export function Study({ song, user, onBack, initialLine }: { song: Song; user: U
             <div className="mt-3 flex gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-emerald-500" />정답</span>
               <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-red-500" />오답</span>
+              {difficulty !== 'hard' && graded.length < total && <span className="flex items-center gap-1"><i className="size-2 rounded-full border border-dashed border-muted-foreground" />빈칸 없음</span>}
             </div>
           </div>
           <div className="mt-4 rounded-2xl border border-border bg-card p-4">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">친구들 기록</h2>
+              <h2 className="text-sm font-semibold">친구들 기록 <span className="font-normal text-muted-foreground">· {DIFFICULTY_LABEL[difficulty]}</span></h2>
               <Users className="size-4 text-muted-foreground" />
             </div>
             {(() => {
               // 내 기록은 항상 최신 값으로, 친구들은 정답 많은 순
-              const others = scores.filter((sc) => sc.uid !== user.uid)
-              const list = [{ uid: user.uid, name: user.name, ok: okCount, total }, ...others].sort((a, b) => b.ok - a.ok)
+              const others = scores
+                .filter((sc) => sc.uid !== user.uid)
+                .map((sc) => ({ uid: sc.uid, name: sc.name, ...(scoreFor(sc, difficulty) ?? { ok: -1, total: 0 }) }))
+                .filter((sc) => sc.ok >= 0)
+              const list = [{ uid: user.uid, name: user.name, ok: okCount, total: graded.length }, ...others].sort((a, b) => b.ok - a.ok)
               return (
                 <div className="flex flex-col gap-4">
                   {list.map((sc) => (
                     <div key={sc.uid}>
                       <div className="mb-1 flex justify-between gap-2 text-xs">
                         <span className="min-w-0 truncate">{sc.name}{sc.uid === user.uid && <span className="ml-1 text-primary">(나)</span>}</span>
-                        <span className="shrink-0 text-muted-foreground tabular-nums">{sc.ok} / {sc.total || total}</span>
+                        <span className="shrink-0 text-muted-foreground tabular-nums">{sc.ok} / {sc.total || graded.length}</span>
                       </div>
-                      <ProgressBar value={((sc.ok) / (sc.total || total)) * 100} />
+                      <ProgressBar value={(sc.ok / Math.max(1, sc.total || graded.length)) * 100} />
                     </div>
                   ))}
-                  {others.length === 0 && <p className="text-xs leading-5 text-muted-foreground">아직 이 곡을 푼 친구가 없어요.</p>}
+                  {others.length === 0 && <p className="text-xs leading-5 text-muted-foreground">아직 이 난이도로 푼 친구가 없어요.</p>}
                 </div>
               )
             })()}

@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Trash2, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { actions, countCorrect, useStore } from '@/lib/store'
+import { actions, countCorrectIn, parseProgKey, progKey, useStore } from '@/lib/store'
+import { gradedLines } from '@/lib/blanks'
+import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty } from '@/lib/types'
 import type { Song } from '@/lib/types'
 import { ProgressBar } from './furigana'
 import { ContinueBanner } from './continue-banner'
@@ -13,7 +15,7 @@ const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start 
 
 export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab }: {
   isAdmin: boolean
-  onSelect: (id: string) => void
+  onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
   onTiming: (id: string) => void
   onInvite: () => void
@@ -24,12 +26,22 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
-  const solved = songs.reduce((n, s) => n + countCorrect(progress[s.id], s.lines.length), 0)
-  // 가장 최근에 공부한 곡 (타이밍이 있어서 풀 수 있는 곡만)
-  const recent = songs
-    .filter((s) => touched[s.id] && (isTimed(s) || isAdmin))
-    .sort((a, b) => (touched[b.id] ?? 0) - (touched[a.id] ?? 0))[0]
-  const finished = songs.filter((s) => s.lines.length > 0 && countCorrect(progress[s.id], s.lines.length) === s.lines.length).length
+  // 곡 × 난이도별 진행 상황
+  const stat = (song: Song, d: Difficulty) => {
+    const lines = gradedLines(song, d)
+    return { d, ok: countCorrectIn(progress[progKey(song.id, d)], lines), total: lines.length }
+  }
+  const solved = songs.reduce((n, s) => n + DIFFICULTIES.reduce((m, d) => m + stat(s, d).ok, 0), 0)
+  // 가장 최근에 공부한 곡과 난이도 (타이밍이 있어서 풀 수 있는 곡만)
+  const recent = Object.entries(touched)
+    .map(([key, at]) => ({ ...parseProgKey(key), at }))
+    .filter((r) => r.at && songs.some((s) => s.id === r.songId && (isTimed(s) || isAdmin)))
+    .sort((a, b) => b.at - a.at)[0]
+  const recentSong = recent ? songs.find((s) => s.id === recent.songId) : undefined
+  const finished = songs.filter((s) => DIFFICULTIES.some((d) => {
+    const x = stat(s, d)
+    return x.total > 0 && x.ok === x.total
+  })).length
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
@@ -50,8 +62,14 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         </div>
       </div>
 
-      {recent && (
-        <ContinueBanner song={recent} progress={progress[recent.id] ?? {}} touchedAt={touched[recent.id]} onContinue={() => onSelect(recent.id)} />
+      {recent && recentSong && (
+        <ContinueBanner
+          song={recentSong}
+          difficulty={recent.d}
+          progress={progress[progKey(recentSong.id, recent.d)] ?? {}}
+          touchedAt={recent.at}
+          onContinue={() => onSelect(recentSong.id, recent.d)}
+        />
       )}
 
       <div className="mb-8 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3">
@@ -73,8 +91,9 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
       <div className="grid gap-4 lg:grid-cols-2">
         {sorted.map((song) => {
           const n = song.lines.length
-          const ok = countCorrect(progress[song.id], n)
-          const pct = n ? Math.round((ok / n) * 100) : 0
+          const stats = DIFFICULTIES.map((d) => stat(song, d))
+          const started = stats.some((x) => x.ok > 0 || Object.keys(progress[progKey(song.id, x.d)] ?? {}).length > 0)
+          const best = [...stats].reverse().find((x) => x.total > 0 && x.ok === x.total)
           const timed = isTimed(song)
           return (
             <ThemedCard key={song.id} song={song} className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
@@ -104,8 +123,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
                     </span>
                   </span>
                 )}
-                {n > 0 && ok === n && (
-                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow">완주</span>
+                {best && (
+                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow">{DIFFICULTY_LABEL[best.d]} 완주</span>
                 )}
               </button>
               <div className="flex items-start justify-between gap-3">
@@ -120,12 +139,25 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
                   <p className="mt-1 text-sm text-muted-foreground">{song.artist}</p>
                 </div>
               </div>
-              <div className="mt-auto pt-6">
-                <div className="mb-2 flex justify-between text-xs">
-                  <span className="text-muted-foreground">내 정답 <b className="text-foreground">{ok} / {n}</b></span>
-                  <span className="font-semibold text-primary">{pct}%</span>
-                </div>
-                <ProgressBar value={pct} />
+              <div className="mt-auto flex flex-col gap-1.5 pt-5">
+                {stats.map((x) => {
+                  const pct = x.total ? Math.round((x.ok / x.total) * 100) : 0
+                  const done = x.total > 0 && x.ok === x.total
+                  return (
+                    <button
+                      key={x.d}
+                      type="button"
+                      onClick={() => (timed || isAdmin) && x.total > 0 && onSelect(song.id, x.d)}
+                      disabled={(!timed && !isAdmin) || x.total === 0}
+                      className="grid grid-cols-[3.25rem_1fr_3.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left text-xs transition hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+                      title={`${DIFFICULTY_LABEL[x.d]}으로 풀기`}
+                    >
+                      <span className={`font-semibold ${done ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{DIFFICULTY_LABEL[x.d]}{done && ' ✓'}</span>
+                      <ProgressBar value={pct} />
+                      <span className="text-right tabular-nums text-muted-foreground">{x.total ? `${x.ok}/${x.total}` : '—'}</span>
+                    </button>
+                  )
+                })}
               </div>
               {timed || isAdmin ? (
                 <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4">
@@ -138,7 +170,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
                       </>
                     )}
                   </div>
-                  <Button size="sm" onClick={() => onSelect(song.id)}>{ok ? '이어서 풀기' : '시작하기'}<ChevronRight data-icon="inline-end" /></Button>
+                  <Button size="sm" onClick={() => onSelect(song.id)}>{started ? '이어서 풀기' : '시작하기'}<ChevronRight data-icon="inline-end" /></Button>
                 </div>
               ) : (
                 <div className="mt-5 border-t border-border pt-4 text-center text-sm text-muted-foreground">관리자가 타이밍을 준비하고 있어요</div>

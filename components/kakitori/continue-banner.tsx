@@ -2,7 +2,8 @@
 
 import { Music2, Play } from 'lucide-react'
 import { themeStyle, useSongHue } from '@/lib/theme'
-import type { Song, SongProgress } from '@/lib/types'
+import { DIFFICULTY_LABEL, type Difficulty, type Song, type SongProgress } from '@/lib/types'
+import { gradedLines } from '@/lib/blanks'
 import { ProgressBar } from './furigana'
 
 function timeAgo(ms: number) {
@@ -18,11 +19,12 @@ function timeAgo(ms: number) {
 }
 
 /** 마지막으로 공부한 곡을 크게 보여주고 바로 이어서 풀게 해요 */
-export function ContinueBanner({ song, progress, touchedAt, onContinue }: { song: Song; progress: SongProgress; touchedAt: number; onContinue: () => void }) {
+export function ContinueBanner({ song, difficulty = 'hard', progress, touchedAt, onContinue }: { song: Song; difficulty?: Difficulty; progress: SongProgress; touchedAt: number; onContinue: () => void }) {
   const theme = useSongHue(song)
-  const total = song.lines.length
-  const ok = song.lines.filter((_, i) => progress[i]?.ok).length
-  const next = song.lines.findIndex((_, i) => !progress[i]?.ok)
+  const lines = gradedLines(song, difficulty)
+  const total = lines.length
+  const ok = lines.filter((i) => progress[i]?.ok).length
+  const next = lines.find((i) => !progress[i]?.ok) ?? -1
   const thumb = song.youtubeId ? `https://i.ytimg.com/vi/${song.youtubeId}/hqdefault.jpg` : null
 
   return (
@@ -51,7 +53,7 @@ export function ContinueBanner({ song, progress, touchedAt, onContinue }: { song
         </button>
 
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold tracking-[0.2em] text-white/70">続きから · 이어서 하기 · {timeAgo(touchedAt)}</p>
+          <p className="text-xs font-semibold tracking-[0.2em] text-white/70">続きから · 이어서 하기 · {DIFFICULTY_LABEL[difficulty]} · {timeAgo(touchedAt)}</p>
           <h2 className="mt-2 truncate font-jp text-2xl font-bold sm:text-3xl">{song.title}</h2>
           <p className="mt-1 text-sm text-white/70">{song.artist}</p>
           <div className="mt-4 max-w-md [&_.bg-muted]:bg-white/20 [&_.bg-primary]:bg-white">

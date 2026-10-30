@@ -41,7 +41,14 @@ export type LineProgress = {
   answer?: string
   /** 마지막으로 적은 한국어 해석 */
   translation?: string
+  /** 쉬움·보통: 빈칸마다 내가 고르거나 쓴 답 */
+  blanks?: string[]
 }
+
+/** 받아쓰기 난이도: 쉬움(빈칸 고르기) · 보통(빈칸 쓰기) · 어려움(문장 전체 받아쓰기) */
+export type Difficulty = 'easy' | 'normal' | 'hard'
+export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: '쉬움', normal: '보통', hard: '어려움' }
 export type SongProgress = Record<number, LineProgress>
 
 export type User = {
