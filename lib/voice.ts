@@ -46,7 +46,7 @@ async function fetchAudio(speaker: number, text: string) {
   if (cache.has(id)) return cache.get(id)!
   try {
     const s = await getDoc(doc(getDb(), 'audio', id))
-    const url = s.exists() && s.data().text === clean(text) ? `data:audio/wav;base64,${s.data().wav}` : null
+    const url = s.exists() && s.data().text === clean(text) ? String(s.data().wav) : null
     cache.set(id, url)
     return url
   } catch {
@@ -54,17 +54,68 @@ async function fetchAudio(speaker: number, text: string) {
   }
 }
 
-let current: HTMLAudioElement | null = null
+// ── 재생 ──────────────────────────────────────
+// 블루투스 헤드셋은 소리가 없으면 잠들었다가 깨는 데 0.2~0.3초가 걸려서, 짧은 소리(가나 한 글자)를 통째로 먹어요.
+// 그래서 처음 재생할 때부터 들리지 않는 아주 작은 소리를 계속 흘려 헤드셋을 깨워 둬요.
+let ctx: AudioContext | null = null
+function audioCtx() {
+  if (typeof window === 'undefined') return null
+  if (!ctx) {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AC) return null
+    ctx = new AC()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.frequency.value = 30
+    gain.gain.value = 0.0005 // 사람 귀에는 안 들리는 크기
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+  }
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  return ctx
+}
+/** 단어장 화면에 들어오거나 처음 누를 때 미리 헤드셋을 깨워요 */
+export function warmUpAudio() {
+  audioCtx()
+}
+
+const decoded = new Map<string, AudioBuffer>()
+let current: AudioBufferSourceNode | null = null
+const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+
+async function playWav(key: string, b64: string) {
+  const c = audioCtx()
+  if (!c) {
+    // Web Audio를 못 쓰는 브라우저
+    await new Audio(`data:audio/wav;base64,${b64}`).play()
+    return
+  }
+  let buf = decoded.get(key)
+  if (!buf) {
+    buf = await c.decodeAudioData(b64ToBytes(b64).buffer as ArrayBuffer)
+    decoded.set(key, buf)
+  }
+  try {
+    current?.stop()
+  } catch {}
+  const src = c.createBufferSource()
+  src.buffer = buf
+  src.connect(c.destination)
+  // 헤드셋이 막 깨어난 경우를 대비해 아주 살짝 늦게 시작해요
+  // (켠 지 얼마 안 됐으면 헤드셋이 깨어날 시간을 더 줘요)
+  src.start(c.currentTime + (c.state !== 'running' || c.currentTime < 0.6 ? 0.4 : 0.03))
+  current = src
+}
+
 /** 저장된 음성이 있으면 재생하고 true, 없으면 false */
 export async function playStored(text: string) {
+  audioCtx()
   const c = await loadVoiceConfig()
   if (!c) return false
-  const url = await fetchAudio(c.speaker, text)
-  if (!url) return false
-  current?.pause()
-  current = new Audio(url)
+  const b64 = await fetchAudio(c.speaker, text)
+  if (!b64) return false
   try {
-    await current.play()
+    await playWav(audioId(c.speaker, text), b64)
     return true
   } catch {
     return false
@@ -112,10 +163,9 @@ function toBase64(bytes: Uint8Array) {
 
 /** 미리 들어보기 (저장 안 함) */
 export async function vvPreview(text: string, speaker: number) {
+  audioCtx()
   const wav = await vvSynth(text, speaker)
-  current?.pause()
-  current = new Audio(`data:audio/wav;base64,${toBase64(wav)}`)
-  await current.play()
+  await playWav(`preview:${speaker}:${text}:${Date.now()}`, toBase64(wav))
 }
 
 /** 아직 없는 음성만 만들어 저장해요 */
@@ -130,7 +180,7 @@ export async function generateAudio(texts: string[], speaker: number, onProgress
       const wav = await vvSynth(text, speaker)
       const b64 = toBase64(wav)
       await setDoc(ref, { text, speaker, wav: b64, createdAt: serverTimestamp() })
-      cache.set(id, `data:audio/wav;base64,${b64}`)
+      cache.set(id, b64)
       made++
     }
     onProgress(i + 1, list.length, made)

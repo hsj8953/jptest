@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { actions, useStore } from '@/lib/store'
 import { HIRAGANA, KATAKANA, cellsOf, type KanaCell, type KanaGroup } from '@/lib/kana'
 import { canSpeak, hasJapaneseVoice, speak, wordKey } from '@/lib/words'
-import { loadVoiceConfig } from '@/lib/voice'
+import { loadVoiceConfig, warmUpAudio } from '@/lib/voice'
 import { VoicePanel } from './voice-panel'
 import type { Song } from '@/lib/types'
 
@@ -129,7 +129,7 @@ function Segmented<T extends string>({ value, onChange, items, small }: { value:
 export function Vocab({ onBack, onGoLine, initialTab, isAdmin = false }: { onBack: () => void; onGoLine: (songId: string, line: number) => void; initialTab?: Tab; isAdmin?: boolean }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'hira')
   return (
-    <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-10">
+    <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-10" onPointerDown={warmUpAudio}>
       <button onClick={onBack} className="mb-2 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" />곡 목록
       </button>
