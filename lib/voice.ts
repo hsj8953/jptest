@@ -38,7 +38,10 @@ const clean = (t: string) => t.trim()
 const toKatakana = (t: string) => t.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
 const isShort = (t: string) => Array.from(clean(t)).length <= 2
 // 가나 한두 글자는 '글자 그대로' 읽게 만들어서 이름을 따로 붙여요 (dk)
-export const audioId = (speaker: number, text: string) => `${VOICE_RECIPE}${isShort(text) ? 'k' : ''}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
+// は행(はひふへほ·ひゃ…)은 모음을 늘려서 만들어서 이름을 또 따로 붙여요 (dh)
+const H_ROW = /^[はひふへほハヒフヘホ]/
+const shortTag = (t: string) => (!isShort(t) ? '' : H_ROW.test(clean(t)) ? 'h' : 'k')
+export const audioId = (speaker: number, text: string) => `${VOICE_RECIPE}${shortTag(text)}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
 
 // 한 번 받은 음성(또는 없다는 사실)은 기억해 둬요
 const cache = new Map<string, string | null>()
@@ -115,6 +118,13 @@ export async function vvSynth(text: string, speaker: number) {
   if (isShort(text) && /^[\u30A1-\u30FCー]+$/.test(kata)) {
     const r = await fetch(`${VOICEVOX_URL}/accent_phrases?speaker=${speaker}&is_kana=true&text=${encodeURIComponent(kata + "'")}`, { method: 'POST' })
     if (r.ok) query.accent_phrases = await r.json()
+    // は행은 목소리에 따라 모음이 다른 글자의 절반쯤으로 짧게 나와서 'ㅎ' 소리만 나고 끊겨 들려요.
+    // は행만 모음 길이를 같은 목소리의 다른 글자(カ) 수준으로 맞춰요.
+    if (H_ROW.test(kata)) {
+      const ref = await fetch(`${VOICEVOX_URL}/accent_phrases?speaker=${speaker}&is_kana=true&text=${encodeURIComponent("カ'")}`, { method: 'POST' })
+      const refLen = ref.ok ? (await ref.json())[0]?.moras?.[0]?.vowel_length ?? 0.18 : 0.18
+      for (const ap of query.accent_phrases ?? []) for (const m of ap.moras as { vowel_length: number }[]) m.vowel_length = Math.max(m.vowel_length, refLen)
+    }
   }
   // 파일 크기만 줄이려고 16kHz로 받아요
   query.outputSamplingRate = 16000
