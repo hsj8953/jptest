@@ -6,7 +6,7 @@ import { getFirebaseAuth } from './firebase'
 import { postAi, type AiError } from './ai-client'
 import { KANJI, answerOf } from './ruby'
 import type { Line, SongWord } from './types'
-import { playStored } from './voice'
+import { getVolume, playStored } from './voice'
 
 const KEEP_POS = new Set(['名詞', '動詞', '形容詞', '副詞', '連体詞'])
 const SKIP_DETAIL = new Set(['数', '非自立', '接尾'])
@@ -135,6 +135,7 @@ export function speak(text: string, rate = 0.9) {
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'ja-JP'
     u.rate = rate
+    u.volume = getVolume()
     if (jaVoice) u.voice = jaVoice
     synth.speak(u)
   }

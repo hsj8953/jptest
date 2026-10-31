@@ -83,6 +83,21 @@ export function warmUpAudio() {
   audioCtx()
 }
 
+// 발음 볼륨 (0~1). 기기마다 따로 기억해요
+const VOL_KEY = 'kakitori-voice-volume'
+let volume = 0.6
+try {
+  const v = typeof localStorage !== 'undefined' ? Number(localStorage.getItem(VOL_KEY)) : NaN
+  if (Number.isFinite(v) && v >= 0 && v <= 1 && localStorage.getItem(VOL_KEY) !== null) volume = v
+} catch {}
+export const getVolume = () => volume
+export function setVolume(v: number) {
+  volume = Math.min(1, Math.max(0, v))
+  try {
+    localStorage.setItem(VOL_KEY, String(volume))
+  } catch {}
+}
+
 const decoded = new Map<string, { buf: AudioBuffer; gain: number }>()
 // VOICEVOX 음성은 원래 꽤 작게 나와요 (최대 음량의 10~20%). 재생할 때 소리 크기를 맞춰 키워요.
 function loudnessGain(buf: AudioBuffer) {
@@ -91,7 +106,7 @@ function loudnessGain(buf: AudioBuffer) {
     const d = buf.getChannelData(ch)
     for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]))
   }
-  return peak > 0 ? Math.min(0.85 / peak, 8) : 1
+  return peak > 0 ? Math.min(0.6 / peak, 6) : 1
 }
 let current: AudioBufferSourceNode | null = null
 const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
@@ -115,7 +130,7 @@ async function playWav(key: string, b64: string) {
   const src = c.createBufferSource()
   src.buffer = hit.buf
   const g = c.createGain()
-  g.gain.value = hit.gain
+  g.gain.value = hit.gain * volume
   src.connect(g).connect(c.destination)
   // 헤드셋이 막 깨어난 경우를 대비해 아주 살짝 늦게 시작해요
   // (켠 지 얼마 안 됐으면 헤드셋이 깨어날 시간을 더 줘요)

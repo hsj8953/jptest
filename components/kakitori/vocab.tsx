@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { actions, useStore } from '@/lib/store'
 import { HIRAGANA, KATAKANA, cellsOf, type KanaCell, type KanaGroup } from '@/lib/kana'
 import { canSpeak, hasJapaneseVoice, speak, wordKey } from '@/lib/words'
-import { loadVoiceConfig, warmUpAudio } from '@/lib/voice'
+import { getVolume, loadVoiceConfig, setVolume, warmUpAudio } from '@/lib/voice'
 import { VoicePanel } from './voice-panel'
 import type { Song } from '@/lib/types'
 
@@ -71,9 +71,44 @@ function VoiceCredit() {
   useEffect(() => {
     loadVoiceConfig().then((c) => setCredit(c?.credit ?? null))
   }, [])
-  if (credit === undefined) return null
-  if (!credit) return <NoVoiceNotice />
-  return <p className="mb-3 text-right text-[11px] text-muted-foreground">음성: {credit}</p>
+  return (
+    <>
+      {credit === null && <NoVoiceNotice />}
+      <div className="mb-3 flex items-center justify-end gap-3 text-[11px] text-muted-foreground">
+        <VolumeControl />
+        {credit && <span>음성: {credit}</span>}
+      </div>
+    </>
+  )
+}
+
+/** 발음 볼륨 (이 기기에만 저장) */
+function VolumeControl() {
+  const [v, setV] = useState(0.6)
+  useEffect(() => setV(getVolume()), [])
+  return (
+    <label className="inline-flex items-center gap-1.5">
+      <Volume2 className="size-3.5" />
+      <span className="sr-only">발음 볼륨</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={v}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          setV(n)
+          setVolume(n)
+        }}
+        onPointerUp={() => speak('あ')}
+        onKeyUp={() => speak('あ')}
+        className="h-1 w-24 accent-primary"
+        aria-label="발음 볼륨"
+      />
+      <span className="w-7 tabular-nums">{Math.round(v * 100)}%</span>
+    </label>
+  )
 }
 
 /** 기기에 일본어 음성이 없으면 안내해요 (없으면 한국어 음성이 일본어를 엉터리로 읽어요) */
