@@ -400,7 +400,7 @@ function WordsTab({ onGoLine }: { onGoLine: (songId: string, line: number) => vo
       ) : mode === 'card' ? (
         <WordCards key={`${songFilter}-${status}`} words={filtered} level={lv} onGoLine={onGoLine} />
       ) : (
-        <WordQuiz key={`${songFilter}-${status}`} words={filtered} pool={all} level={lv} />
+        <WordQuiz key={`${songFilter}-${status}`} words={filtered} pool={all} level={lv} onGoLine={onGoLine} />
       )}
     </section>
   )
@@ -523,7 +523,7 @@ function WordCards({ words, level, onGoLine }: { words: VWord[]; level: (w: VWor
   )
 }
 
-function WordQuiz({ words, pool, level }: { words: VWord[]; pool: VWord[]; level: (w: VWord) => number }) {
+function WordQuiz({ words, pool, level, onGoLine }: { words: VWord[]; pool: VWord[]; level: (w: VWord) => number; onGoLine: (songId: string, line: number) => void }) {
   const [kind, setKind] = useState<'meaning' | 'reading'>('meaning')
   const [q, setQ] = useState<VWord | null>(null)
   const [choices, setChoices] = useState<string[]>([])
@@ -575,6 +575,7 @@ function WordQuiz({ words, pool, level }: { words: VWord[]; pool: VWord[]; level
         <div className="rounded-3xl border border-border bg-card p-6 text-center shadow-sm">
           <div className="flex justify-end"><Dots level={level(q)} /></div>
           <p lang="ja" className="font-jp text-5xl font-semibold leading-tight">{q.word}</p>
+          <p className="mt-2 truncate text-xs text-muted-foreground">♪ <span className="font-jp">{q.songs.map((x) => x.title).join(' · ')}</span></p>
           <p className="mt-2 text-sm text-muted-foreground">{kind === 'meaning' ? '이 단어의 뜻은?' : '이 단어는 어떻게 읽을까요?'}</p>
           <div className="mt-6 grid gap-2">
             {choices.map((v) => {
@@ -591,6 +592,7 @@ function WordQuiz({ words, pool, level }: { words: VWord[]; pool: VWord[]; level
               <p className="mt-4 text-sm text-muted-foreground">
                 <span lang="ja" className="font-jp text-foreground">{q.word}</span> · <span lang="ja" className="font-jp">{q.reading}</span> · {q.meaning}
               </p>
+              <div className="mt-3 flex justify-center"><SongChips w={q} onGoLine={onGoLine} /></div>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <ListenAgain text={q.reading || q.word} />
                 <Button className="h-12 text-base" onClick={() => next(q)}>
