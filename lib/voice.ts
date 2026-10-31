@@ -34,9 +34,10 @@ function fnv(s: string) {
   return h.toString(36)
 }
 const clean = (t: string) => t.trim()
+const toKatakana = (t: string) => t.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
 const isShort = (t: string) => Array.from(clean(t)).length <= 2
-// 한두 글자(가나 표)는 읽는 방식을 바꿔서 새 이름으로 저장해요 (k2 = 두 번째 방식)
-export const audioId = (speaker: number, text: string) => `${isShort(text) ? 'k2' : 'v'}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
+// 한두 글자(가나 표)는 읽는 방식을 바꿔서 새 이름으로 저장해요 (k3 = 세 번째 방식)
+export const audioId = (speaker: number, text: string) => `${isShort(text) ? 'k3' : 'v'}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
 
 // 한 번 받은 음성(또는 없다는 사실)은 기억해 둬요
 const cache = new Map<string, string | null>()
@@ -136,6 +137,13 @@ export async function vvSynth(text: string, speaker: number) {
   const q = await fetch(`${VOICEVOX_URL}/audio_query?speaker=${speaker}&text=${encodeURIComponent(clean(text))}`, { method: 'POST' })
   if (!q.ok) throw new Error(`audio_query ${q.status}`)
   const query = await q.json()
+  // 가나 한두 글자를 문장으로 읽게 하면 は를 조사 'わ', へ를 'え'로 읽고, あ·う 같은 건 감탄사처럼 작게 읽어요.
+  // 그래서 '글자 그대로' 읽는 가나 표기(AquesTalk 표기: カタカナ + 악센트 ')로 다시 만들어요.
+  const kata = toKatakana(clean(text))
+  if (isShort(text) && /^[\u30A1-\u30FCー]+$/.test(kata)) {
+    const r = await fetch(`${VOICEVOX_URL}/accent_phrases?speaker=${speaker}&is_kana=true&text=${encodeURIComponent(kata + "'")}`, { method: 'POST' })
+    if (r.ok) query.accent_phrases = await r.json()
+  }
   // 파일을 작게: 16kHz. 재생 시작할 때 앞이 잘리지 않게 앞뒤에 무음을 조금 둬요
   Object.assign(query, { speedScale: SPEED, outputSamplingRate: 16000, prePhonemeLength: 0.15, postPhonemeLength: 0.2 })
   if (isShort(text)) {
@@ -148,7 +156,7 @@ export async function vvSynth(text: string, speaker: number) {
         if (m.vowel !== 'cl') m.vowel_length = Math.max(m.vowel_length, 0.28)
       }
     }
-    Object.assign(query, { speedScale: 0.8, postPhonemeLength: 0.3 })
+    Object.assign(query, { speedScale: 0.8, postPhonemeLength: 0.3, volumeScale: 1.4 })
   }
   const s = await fetch(`${VOICEVOX_URL}/synthesis?speaker=${speaker}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(query) })
   if (!s.ok) throw new Error(`synthesis ${s.status}`)
