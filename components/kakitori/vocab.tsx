@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { actions, useStore } from '@/lib/store'
 import { HIRAGANA, KATAKANA, cellsOf, type KanaCell, type KanaGroup } from '@/lib/kana'
 import { canSpeak, hasJapaneseVoice, speak, wordKey } from '@/lib/words'
-import { getVolume, loadVoiceConfig, setVolume, warmUpAudio } from '@/lib/voice'
+import { getVolume, loadVoiceConfig, setVolume } from '@/lib/voice'
 import { VoicePanel } from './voice-panel'
 import type { Song } from '@/lib/types'
 
@@ -84,7 +84,7 @@ function VoiceCredit() {
 
 /** 발음 볼륨 (이 기기에만 저장) */
 function VolumeControl() {
-  const [v, setV] = useState(0.6)
+  const [v, setV] = useState(1)
   useEffect(() => setV(getVolume()), [])
   return (
     <label className="inline-flex items-center gap-1.5">
@@ -164,7 +164,7 @@ function Segmented<T extends string>({ value, onChange, items, small }: { value:
 export function Vocab({ onBack, onGoLine, initialTab, isAdmin = false }: { onBack: () => void; onGoLine: (songId: string, line: number) => void; initialTab?: Tab; isAdmin?: boolean }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'hira')
   return (
-    <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-10" onPointerDown={warmUpAudio}>
+    <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-10">
       <button onClick={onBack} className="mb-2 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" />곡 목록
       </button>
