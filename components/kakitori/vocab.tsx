@@ -85,6 +85,15 @@ function NoVoiceNotice() {
   )
 }
 
+/** 답을 본 뒤 발음을 다시 듣는 버튼 */
+function ListenAgain({ text, rate, className = '' }: { text: string; rate?: number; className?: string }) {
+  return (
+    <Button type="button" variant="outline" className={`h-12 text-base ${className}`} onClick={(e) => { e.stopPropagation(); speak(text, rate) }}>
+      <Volume2 data-icon="inline-start" />발음 다시 듣기
+    </Button>
+  )
+}
+
 function Segmented<T extends string>({ value, onChange, items, small }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; icon?: React.ReactNode }[]; small?: boolean }) {
   return (
     <div className="inline-flex rounded-xl bg-muted p-1" role="tablist">
@@ -293,9 +302,12 @@ function KanaQuiz({ groups }: { groups: KanaGroup[] }) {
             })}
           </div>
           {picked && (
-            <Button className="mt-5 h-12 w-full text-base" onClick={() => next(q)}>
-              다음 글자<ChevronRight data-icon="inline-end" />
-            </Button>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <ListenAgain text={q.kana} rate={0.8} />
+              <Button className="h-12 text-base" onClick={() => next(q)}>
+                다음 글자<ChevronRight data-icon="inline-end" />
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -480,7 +492,10 @@ function WordCards({ words, level, onGoLine }: { words: VWord[]; level: (w: VWor
         <Dots level={level(w)} />
       </div>
       <button
-        onClick={() => setFlip((f) => !f)}
+        onClick={() => {
+          if (!flip) speak(w.reading || w.word)
+          setFlip((f) => !f)
+        }}
         className="flex min-h-72 w-full flex-col items-center justify-center rounded-3xl border border-border bg-card p-6 text-center shadow-sm transition hover:shadow-md"
         aria-label={flip ? '앞면 보기' : '뜻 보기'}
       >
@@ -491,13 +506,13 @@ function WordCards({ words, level, onGoLine }: { words: VWord[]; level: (w: VWor
             <span className="text-lg">{w.meaning || '뜻 없음'}</span>
           </span>
         ) : (
-          <span className="mt-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground"><Eye className="size-4" />눌러서 읽기와 뜻 보기</span>
+          <span className="mt-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground"><Eye className="size-4" />눌러서 읽기·뜻 보고 발음 듣기</span>
         )}
       </button>
       {flip && (
-        <div className="hint-pop mt-3 flex items-center justify-between gap-2">
+        <div className="hint-pop mt-3 flex flex-col gap-2">
+          <ListenAgain text={w.reading || w.word} className="w-full" />
           <SongChips w={w} onGoLine={onGoLine} />
-          <SpeakButton text={w.reading || w.word} />
         </div>
       )}
       <div className="mt-4 grid grid-cols-2 gap-2">
@@ -538,7 +553,7 @@ function WordQuiz({ words, pool, level }: { words: VWord[]; pool: VWord[]; level
     const lv = level(q)
     actions.saveVocab({ words: { [q.key]: ok ? up(lv) : down(lv) } }).catch(() => {})
     setScore((s) => ({ right: s.right + (ok ? 1 : 0), total: s.total + 1 }))
-    if (kind === 'reading' || ok) speak(q.reading || q.word)
+    speak(q.reading || q.word)
   }
 
   return (
@@ -576,9 +591,12 @@ function WordQuiz({ words, pool, level }: { words: VWord[]; pool: VWord[]; level
               <p className="mt-4 text-sm text-muted-foreground">
                 <span lang="ja" className="font-jp text-foreground">{q.word}</span> · <span lang="ja" className="font-jp">{q.reading}</span> · {q.meaning}
               </p>
-              <Button className="mt-4 h-12 w-full text-base" onClick={() => next(q)}>
-                다음 단어<ChevronRight data-icon="inline-end" />
-              </Button>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <ListenAgain text={q.reading || q.word} />
+                <Button className="h-12 text-base" onClick={() => next(q)}>
+                  다음 단어<ChevronRight data-icon="inline-end" />
+                </Button>
+              </div>
             </>
           )}
         </div>
