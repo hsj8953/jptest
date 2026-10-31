@@ -123,3 +123,13 @@ export async function generateAudio(texts: string[], speaker: number, onProgress
   }
   return { total: list.length, made }
 }
+
+/** VOICEVOX가 켜져 있는지 빠르게 확인 (꺼져 있으면 1.5초 안에 false) */
+export async function vvAvailable() {
+  try {
+    const r = await fetch(`${VOICEVOX_URL}/version`, { signal: AbortSignal.timeout(1500) })
+    return r.ok
+  } catch {
+    return false
+  }
+}

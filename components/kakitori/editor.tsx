@@ -11,6 +11,7 @@ import { fullyRead, htmlToRuby, parenToRuby } from '@/lib/paste-lyrics'
 import { parseYouTubeId } from '@/lib/youtube'
 import type { Line, Song, SongWord } from '@/lib/types'
 import { WordEditor } from './word-editor'
+import { generateAudio, loadVoiceConfig, vvAvailable } from '@/lib/voice'
 import { BackButton, Furigana } from './furigana'
 
 // 붙여넣은 가사의 부수·호환 한자는 일반 한자로 정리해요
@@ -27,6 +28,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
   const [furiMsg, setFuriMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [saveMsg, setSaveMsg] = useState('')
   const [words, setWords] = useState<SongWord[]>(song?.words ?? [])
 
   const jpCount = splitLines(jp).length
@@ -107,6 +109,16 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
         .map((w) => ({ ...w, word: normalizeKanji(w.word).trim(), reading: w.reading.trim(), meaning: w.meaning.trim() }))
         .filter((w) => w.word)
       await actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, words: cleanWords, createdAt: song?.createdAt ?? Date.now() })
+      // VOICEVOX가 켜져 있으면 이 곡 단어 음성도 같이 만들어요 (꺼져 있으면 그냥 넘어가요)
+      const texts = cleanWords.map((w) => w.reading || w.word)
+      const voice = texts.length ? await loadVoiceConfig() : null
+      if (voice && (await vvAvailable())) {
+        try {
+          await generateAudio(texts, voice.speaker, (d, t) => setSaveMsg(`저장했어요. 단어 음성 만드는 중… ${d} / ${t}`))
+        } catch {
+          // 음성은 나중에 단어장의 '음성 만들기'에서 다시 만들 수 있어요
+        }
+      }
       onSaved(id)
     } catch {
       setError('저장하지 못했어요. 관리자 계정인지, 인터넷이 연결돼 있는지 확인해 주세요.')
@@ -186,6 +198,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
 
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
         {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
+        {!error && saveMsg && <p className="mr-auto text-sm text-muted-foreground">{saveMsg}</p>}
         <Button variant="outline" onClick={onBack}>취소</Button>
         <Button onClick={save} disabled={busy}>저장하고 타이밍 맞추기<ChevronRight data-icon="inline-end" /></Button>
       </div>
