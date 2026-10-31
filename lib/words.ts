@@ -94,27 +94,50 @@ export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?
 
 // ── 발음 (기기에 내장된 일본어 음성) ─────────────────
 let jaVoice: SpeechSynthesisVoice | null | undefined
+// 구글 일본어 음성(크롬이면 윈도우·맥 어디서나 같음)을 먼저 쓰고, 없으면 기기에 깔린 일본어 음성
 function pickVoice() {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null
   const voices = window.speechSynthesis.getVoices()
-  jaVoice = voices.find((v) => v.lang === 'ja-JP') ?? voices.find((v) => v.lang.startsWith('ja')) ?? null
+  if (!voices.length) return undefined
+  const ja = voices.filter((v) => v.lang.replace('_', '-').toLowerCase().startsWith('ja'))
+  jaVoice = ja.find((v) => /google/i.test(v.name)) ?? ja.find((v) => /natural|online/i.test(v.name)) ?? ja.find((v) => v.localService) ?? ja[0] ?? null
   return jaVoice
 }
 export function canSpeak() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window
 }
+/** 일본어 음성이 있는지 (목록을 아직 못 불러왔으면 undefined) */
+export function hasJapaneseVoice() {
+  if (!canSpeak()) return false
+  if (jaVoice === undefined) pickVoice()
+  return jaVoice === undefined ? undefined : !!jaVoice
+}
+// 크롬은 음성 목록을 늦게 불러와요. 목록이 올 때까지 잠깐 기다렸다가 읽어요
+function voicesReady(): Promise<void> {
+  const synth = window.speechSynthesis
+  if (synth.getVoices().length) return Promise.resolve()
+  return new Promise((resolve) => {
+    const done = () => {
+      synth.removeEventListener('voiceschanged', done)
+      resolve()
+    }
+    synth.addEventListener('voiceschanged', done)
+    setTimeout(done, 1500)
+  })
+}
 export function speak(text: string, rate = 0.9) {
   if (!canSpeak()) return false
   const synth = window.speechSynthesis
-  if (jaVoice === undefined) {
-    pickVoice()
-    synth.onvoiceschanged = () => pickVoice()
+  const say = () => {
+    if (jaVoice === undefined) pickVoice()
+    synth.cancel()
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = 'ja-JP'
+    u.rate = rate
+    if (jaVoice) u.voice = jaVoice
+    synth.speak(u)
   }
-  synth.cancel()
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'ja-JP'
-  u.rate = rate
-  if (jaVoice) u.voice = jaVoice
-  synth.speak(u)
+  if (jaVoice !== undefined) say()
+  else voicesReady().then(say)
   return true
 }

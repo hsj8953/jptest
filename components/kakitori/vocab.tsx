@@ -5,7 +5,7 @@ import { ArrowLeft, BookOpen, Check, ChevronRight, Eye, Layers, ListChecks, Rota
 import { Button } from '@/components/ui/button'
 import { actions, useStore } from '@/lib/store'
 import { HIRAGANA, KATAKANA, cellsOf, type KanaCell, type KanaGroup } from '@/lib/kana'
-import { canSpeak, speak, wordKey } from '@/lib/words'
+import { canSpeak, hasJapaneseVoice, speak, wordKey } from '@/lib/words'
 import type { Song } from '@/lib/types'
 
 type Tab = 'hira' | 'kata' | 'words'
@@ -63,6 +63,28 @@ function SpeakButton({ text, className = '' }: { text: string; className?: strin
   )
 }
 
+/** 기기에 일본어 음성이 없으면 안내해요 (없으면 한국어 음성이 일본어를 엉터리로 읽어요) */
+function NoVoiceNotice() {
+  const [missing, setMissing] = useState(false)
+  useEffect(() => {
+    if (!canSpeak()) return
+    const check = () => setMissing(hasJapaneseVoice() === false)
+    check()
+    window.speechSynthesis.addEventListener('voiceschanged', check)
+    const t = setTimeout(check, 1500)
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', check)
+      clearTimeout(t)
+    }
+  }, [])
+  if (!missing) return null
+  return (
+    <p className="mb-4 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+      이 기기에는 일본어 음성이 없어서 발음이 어색하게 들릴 수 있어요. 윈도우는 <b>설정 → 시간 및 언어 → 음성 → 음성 추가</b>에서 <b>일본어</b>를 설치한 뒤 브라우저를 다시 켜 주세요.
+    </p>
+  )
+}
+
 function Segmented<T extends string>({ value, onChange, items, small }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; icon?: React.ReactNode }[]; small?: boolean }) {
   return (
     <div className="inline-flex rounded-xl bg-muted p-1" role="tablist">
@@ -106,6 +128,7 @@ export function Vocab({ onBack, onGoLine, initialTab }: { onBack: () => void; on
           ]}
         />
       </div>
+      <NoVoiceNotice />
       {tab === 'hira' && <KanaTab key="hira" groups={HIRAGANA} name="히라가나" />}
       {tab === 'kata' && <KanaTab key="kata" groups={KATAKANA} name="가타카나" />}
       {tab === 'words' && <WordsTab onGoLine={onGoLine} />}
