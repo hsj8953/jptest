@@ -8,6 +8,9 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { getDb } from './firebase'
 
+/** 음성 만드는 방식 버전 (관리자 화면에 표시해서 새 버전이 배포됐는지 확인용) */
+export const VOICE_RECIPE = 'k3'
+
 export const VOICEVOX_URL = 'http://localhost:50021'
 /** 음성 속도 (1 = 보통) */
 const SPEED = 0.9
@@ -37,7 +40,7 @@ const clean = (t: string) => t.trim()
 const toKatakana = (t: string) => t.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
 const isShort = (t: string) => Array.from(clean(t)).length <= 2
 // 한두 글자(가나 표)는 읽는 방식을 바꿔서 새 이름으로 저장해요 (k3 = 세 번째 방식)
-export const audioId = (speaker: number, text: string) => `${isShort(text) ? 'k3' : 'v'}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
+export const audioId = (speaker: number, text: string) => `${isShort(text) ? VOICE_RECIPE : 'v'}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
 
 // 한 번 받은 음성(또는 없다는 사실)은 기억해 둬요
 const cache = new Map<string, string | null>()
@@ -80,7 +83,16 @@ export function warmUpAudio() {
   audioCtx()
 }
 
-const decoded = new Map<string, AudioBuffer>()
+const decoded = new Map<string, { buf: AudioBuffer; gain: number }>()
+// VOICEVOX 음성은 원래 꽤 작게 나와요 (최대 음량의 10~20%). 재생할 때 소리 크기를 맞춰 키워요.
+function loudnessGain(buf: AudioBuffer) {
+  let peak = 0
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+    const d = buf.getChannelData(ch)
+    for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]))
+  }
+  return peak > 0 ? Math.min(0.85 / peak, 8) : 1
+}
 let current: AudioBufferSourceNode | null = null
 const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
 
@@ -91,17 +103,20 @@ async function playWav(key: string, b64: string) {
     await new Audio(`data:audio/wav;base64,${b64}`).play()
     return
   }
-  let buf = decoded.get(key)
-  if (!buf) {
-    buf = await c.decodeAudioData(b64ToBytes(b64).buffer as ArrayBuffer)
-    decoded.set(key, buf)
+  let hit = decoded.get(key)
+  if (!hit) {
+    const buf = await c.decodeAudioData(b64ToBytes(b64).buffer as ArrayBuffer)
+    hit = { buf, gain: loudnessGain(buf) }
+    decoded.set(key, hit)
   }
   try {
     current?.stop()
   } catch {}
   const src = c.createBufferSource()
-  src.buffer = buf
-  src.connect(c.destination)
+  src.buffer = hit.buf
+  const g = c.createGain()
+  g.gain.value = hit.gain
+  src.connect(g).connect(c.destination)
   // 헤드셋이 막 깨어난 경우를 대비해 아주 살짝 늦게 시작해요
   // (켠 지 얼마 안 됐으면 헤드셋이 깨어날 시간을 더 줘요)
   src.start(c.currentTime + (c.state !== 'running' || c.currentTime < 0.6 ? 0.4 : 0.03))

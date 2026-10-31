@@ -5,7 +5,7 @@ import { Loader2, Mic, Play, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HIRAGANA, KATAKANA, cellsOf } from '@/lib/kana'
 import { useStore } from '@/lib/store'
-import { generateAudio, loadVoiceConfig, saveVoiceConfig, vvPreview, vvSpeakers, type VoiceConfig, type VvSpeaker } from '@/lib/voice'
+import { VOICE_RECIPE, generateAudio, loadVoiceConfig, saveVoiceConfig, vvPreview, vvSpeakers, type VoiceConfig, type VvSpeaker } from '@/lib/voice'
 
 /** 관리자용: VOICEVOX로 단어장 음성 만들기 */
 export function VoicePanel() {
@@ -78,7 +78,7 @@ export function VoicePanel() {
   return (
     <section className="mb-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold">음성 만들기 <span className="font-normal text-muted-foreground">· VOICEVOX</span></h2>
+        <h2 className="text-sm font-semibold">음성 만들기 <span className="font-normal text-muted-foreground">· VOICEVOX · 방식 {VOICE_RECIPE}</span></h2>
         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${conn === 'ok' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : conn === 'fail' ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}>
           {conn === 'ok' ? '연결됨' : conn === 'fail' ? '연결 안 됨' : '확인 중…'}
         </span>
