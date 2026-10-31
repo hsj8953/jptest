@@ -35,7 +35,10 @@ function fnv(s: string) {
   return h.toString(36)
 }
 const clean = (t: string) => t.trim()
-export const audioId = (speaker: number, text: string) => `${VOICE_RECIPE}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
+const toKatakana = (t: string) => t.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
+const isShort = (t: string) => Array.from(clean(t)).length <= 2
+// 가나 한두 글자는 '글자 그대로' 읽게 만들어서 이름을 따로 붙여요 (dk)
+export const audioId = (speaker: number, text: string) => `${VOICE_RECIPE}${isShort(text) ? 'k' : ''}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
 
 // 한 번 받은 음성(또는 없다는 사실)은 기억해 둬요
 const cache = new Map<string, string | null>()
@@ -106,7 +109,14 @@ export async function vvSynth(text: string, speaker: number) {
   const q = await fetch(`${VOICEVOX_URL}/audio_query?speaker=${speaker}&text=${encodeURIComponent(clean(text))}`, { method: 'POST' })
   if (!q.ok) throw new Error(`audio_query ${q.status}`)
   const query = await q.json()
-  // VOICEVOX 기본 설정 그대로 (파일 크기만 줄이려고 16kHz로 받아요)
+  // 가나 한두 글자를 그대로 넘기면 は를 조사 'わ', へ를 'え'로 읽어요.
+  // 그래서 글자 그대로 읽는 가나 표기(カタカナ + 악센트 ')로 읽는 법만 바꿔요. 나머지는 기본 설정 그대로예요.
+  const kata = toKatakana(clean(text))
+  if (isShort(text) && /^[\u30A1-\u30FCー]+$/.test(kata)) {
+    const r = await fetch(`${VOICEVOX_URL}/accent_phrases?speaker=${speaker}&is_kana=true&text=${encodeURIComponent(kata + "'")}`, { method: 'POST' })
+    if (r.ok) query.accent_phrases = await r.json()
+  }
+  // 파일 크기만 줄이려고 16kHz로 받아요
   query.outputSamplingRate = 16000
   const s = await fetch(`${VOICEVOX_URL}/synthesis?speaker=${speaker}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(query) })
   if (!s.ok) throw new Error(`synthesis ${s.status}`)
