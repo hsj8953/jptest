@@ -22,6 +22,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 단어장 음성 설정(목소리)과 음성 파일: 멤버는 듣기만, 만드는 건 관리자만
+    match /config/voice {
+      allow read: if member();
+      allow write: if isAdmin();
+    }
+    match /audio/{id} {
+      allow read: if member();
+      allow write: if isAdmin();
+    }
+
     // 곡: 멤버는 읽기, 관리자만 쓰기
     match /songs/{songId} {
       allow read: if member();

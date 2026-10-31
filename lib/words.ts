@@ -6,6 +6,7 @@ import { getFirebaseAuth } from './firebase'
 import { postAi, type AiError } from './ai-client'
 import { KANJI, answerOf } from './ruby'
 import type { Line, SongWord } from './types'
+import { playStored } from './voice'
 
 const KEEP_POS = new Set(['名詞', '動詞', '形容詞', '副詞', '連体詞'])
 const SKIP_DETAIL = new Set(['数', '非自立', '接尾'])
@@ -137,7 +138,9 @@ export function speak(text: string, rate = 0.9) {
     if (jaVoice) u.voice = jaVoice
     synth.speak(u)
   }
-  if (jaVoice !== undefined) say()
-  else voicesReady().then(say)
+  const fallback = () => (jaVoice !== undefined ? say() : voicesReady().then(say))
+  // VOICEVOX로 만들어 둔 음성이 있으면 그걸 먼저 들려줘요 (없으면 기기 음성)
+  synth.cancel()
+  playStored(text).then((ok) => ok || fallback(), fallback)
   return true
 }

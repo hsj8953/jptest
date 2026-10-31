@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { actions, useStore } from '@/lib/store'
 import { HIRAGANA, KATAKANA, cellsOf, type KanaCell, type KanaGroup } from '@/lib/kana'
 import { canSpeak, hasJapaneseVoice, speak, wordKey } from '@/lib/words'
+import { loadVoiceConfig } from '@/lib/voice'
+import { VoicePanel } from './voice-panel'
 import type { Song } from '@/lib/types'
 
 type Tab = 'hira' | 'kata' | 'words'
@@ -63,6 +65,17 @@ function SpeakButton({ text, className = '' }: { text: string; className?: strin
   )
 }
 
+/** VOICEVOX 음성 출처 (사용 조건) — 음성이 없으면 기기 음성 안내 */
+function VoiceCredit() {
+  const [credit, setCredit] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    loadVoiceConfig().then((c) => setCredit(c?.credit ?? null))
+  }, [])
+  if (credit === undefined) return null
+  if (!credit) return <NoVoiceNotice />
+  return <p className="mb-3 text-right text-[11px] text-muted-foreground">음성: {credit}</p>
+}
+
 /** 기기에 일본어 음성이 없으면 안내해요 (없으면 한국어 음성이 일본어를 엉터리로 읽어요) */
 function NoVoiceNotice() {
   const [missing, setMissing] = useState(false)
@@ -113,7 +126,7 @@ function Segmented<T extends string>({ value, onChange, items, small }: { value:
   )
 }
 
-export function Vocab({ onBack, onGoLine, initialTab }: { onBack: () => void; onGoLine: (songId: string, line: number) => void; initialTab?: Tab }) {
+export function Vocab({ onBack, onGoLine, initialTab, isAdmin = false }: { onBack: () => void; onGoLine: (songId: string, line: number) => void; initialTab?: Tab; isAdmin?: boolean }) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'hira')
   return (
     <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-10">
@@ -137,7 +150,8 @@ export function Vocab({ onBack, onGoLine, initialTab }: { onBack: () => void; on
           ]}
         />
       </div>
-      <NoVoiceNotice />
+      {isAdmin && <VoicePanel />}
+      <VoiceCredit />
       {tab === 'hira' && <KanaTab key="hira" groups={HIRAGANA} name="히라가나" />}
       {tab === 'kata' && <KanaTab key="kata" groups={KATAKANA} name="가타카나" />}
       {tab === 'words' && <WordsTab onGoLine={onGoLine} />}

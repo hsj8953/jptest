@@ -224,7 +224,7 @@ export default function Page() {
   const needsSong = view === 'study' || view === 'timing' || (view === 'editor' && !!selectedId)
   if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
-  else if (view === 'vocab') body = <Vocab onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
+  else if (view === 'vocab') body = <Vocab isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
   else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? 'new'} song={selected} onBack={goLibrary} onSaved={(id) => go('timing', id)} />
   else if (view === 'timing' && isAdmin && selected) body = <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
   else if (view === 'study' && selected && !diff)
