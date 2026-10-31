@@ -34,7 +34,9 @@ function fnv(s: string) {
   return h.toString(36)
 }
 const clean = (t: string) => t.trim()
-export const audioId = (speaker: number, text: string) => `v${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
+const isShort = (t: string) => Array.from(clean(t)).length <= 2
+// 한두 글자(가나 표)는 읽는 방식을 바꿔서 새 이름으로 저장해요 (k2 = 두 번째 방식)
+export const audioId = (speaker: number, text: string) => `${isShort(text) ? 'k2' : 'v'}${speaker}_${fnv(clean(text))}_${Array.from(clean(text)).length}`
 
 // 한 번 받은 음성(또는 없다는 사실)은 기억해 둬요
 const cache = new Map<string, string | null>()
@@ -83,8 +85,20 @@ export async function vvSynth(text: string, speaker: number) {
   const q = await fetch(`${VOICEVOX_URL}/audio_query?speaker=${speaker}&text=${encodeURIComponent(clean(text))}`, { method: 'POST' })
   if (!q.ok) throw new Error(`audio_query ${q.status}`)
   const query = await q.json()
-  // 파일을 작게: 16kHz, 앞뒤 무음 짧게
-  Object.assign(query, { speedScale: SPEED, outputSamplingRate: 16000, prePhonemeLength: 0.05, postPhonemeLength: 0.1 })
+  // 파일을 작게: 16kHz. 재생 시작할 때 앞이 잘리지 않게 앞뒤에 무음을 조금 둬요
+  Object.assign(query, { speedScale: SPEED, outputSamplingRate: 16000, prePhonemeLength: 0.15, postPhonemeLength: 0.2 })
+  if (isShort(text)) {
+    // 한두 글자는 너무 짧고, し·す처럼 모음이 소리 없이(무성화) 끝나서 끊겨 들려요.
+    // 모음을 소리 내게 바꾸고, 천천히·길게 읽어요.
+    type Mora = { vowel: string; vowel_length: number; consonant_length?: number | null }
+    for (const ap of query.accent_phrases ?? []) {
+      for (const m of ap.moras as Mora[]) {
+        if (/^[AIUEO]$/.test(m.vowel)) m.vowel = m.vowel.toLowerCase()
+        if (m.vowel !== 'cl') m.vowel_length = Math.max(m.vowel_length, 0.28)
+      }
+    }
+    Object.assign(query, { speedScale: 0.8, postPhonemeLength: 0.3 })
+  }
   const s = await fetch(`${VOICEVOX_URL}/synthesis?speaker=${speaker}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(query) })
   if (!s.ok) throw new Error(`synthesis ${s.status}`)
   return new Uint8Array(await s.arrayBuffer())
