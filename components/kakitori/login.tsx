@@ -1,6 +1,8 @@
 import { BookOpen, Headphones, PenLine, Users } from 'lucide-react'
 import { DictationDemo, FloatingKana } from './login-demo'
 import { Button } from '@/components/ui/button'
+import { useEffect, useState } from 'react'
+import { hasAccessRequest, sendAccessRequest, watchInvited } from '@/lib/store'
 
 export function Login({ onLogin, busy, error }: { onLogin: () => void; busy?: boolean; error?: string }) {
   return (
@@ -49,14 +51,53 @@ function GoogleIcon() {
 }
 
 /** Firebase 로그인을 붙이면, 초대 목록에 없는 계정에게 보여줄 화면 */
-export function NotInvited({ email, onLogout }: { email: string; onLogout: () => void }) {
+export function NotInvited({ email, uid, onLogout, onApproved }: { email: string; uid: string; onLogout: () => void; onApproved: () => void }) {
+  const [state, setState] = useState<'loading' | 'none' | 'sent' | 'sending'>('loading')
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    hasAccessRequest(uid).then((r) => setState(r ? 'sent' : 'none'))
+    // 관리자가 승인하면 새로고침 없이 바로 들어가요
+    return watchInvited(email, onApproved)
+  }, [uid, email]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setState('sending')
+    setError('')
+    try {
+      await sendAccessRequest(uid, email, name)
+      setState('sent')
+    } catch {
+      setError('요청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.')
+      setState('none')
+    }
+  }
+
   return (
     <main className="grid min-h-screen place-items-center px-4">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center">
-        <h1 className="text-xl font-bold">아직 초대되지 않은 계정이에요</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">관리자에게 아래 이메일을 초대 목록에 넣어달라고 말해 주세요. 추가된 뒤 새로고침하면 들어갈 수 있어요.</p>
-        <p className="mt-4 rounded-lg bg-muted px-3 py-2 font-mono text-sm">{email}</p>
-        <Button variant="outline" onClick={onLogout} className="mt-6 w-full">다른 계정으로 로그인</Button>
+        {state === 'sent' ? (
+          <>
+            <h1 className="text-xl font-bold">승인을 기다리는 중이에요</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">관리자에게 요청을 보냈어요. 승인되면 이 화면에서 바로 들어가져요. 창을 닫았다가 나중에 다시 와도 돼요.</p>
+            <p className="mt-4 rounded-lg bg-muted px-3 py-2 font-mono text-sm">{email}</p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-xl font-bold">아직 초대되지 않은 계정이에요</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">관리자에게 승인을 요청하면, 승인된 뒤 바로 들어갈 수 있어요.</p>
+            <p className="mt-4 rounded-lg bg-muted px-3 py-2 font-mono text-sm">{email}</p>
+            <form onSubmit={send} className="mt-4 text-left">
+              <label htmlFor="req-name" className="text-sm font-semibold">관리자가 알아볼 이름 <span className="font-normal text-muted-foreground">(선택)</span></label>
+              <input id="req-name" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 같은 반 민수" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 outline-none focus:ring-2 focus:ring-ring" />
+              {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+              <Button type="submit" disabled={state !== 'none'} className="mt-3 h-11 w-full">{state === 'sending' ? '보내는 중…' : '승인 요청하기'}</Button>
+            </form>
+          </>
+        )}
+        <Button variant="outline" onClick={onLogout} className="mt-3 w-full">다른 계정으로 로그인</Button>
       </div>
     </main>
   )

@@ -22,6 +22,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 승인 요청: 로그인한 사람은 자기 요청만 만들고 볼 수 있고, 목록 보기·처리는 관리자만
+    match /requests/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.email == email()
+        && request.resource.data.keys().hasOnly(['email', 'name', 'createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 20;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
     // 단어장 음성 설정(목소리)과 음성 파일: 멤버는 듣기만, 만드는 건 관리자만
     match /config/voice {
       allow read: if member();

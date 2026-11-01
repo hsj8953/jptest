@@ -5,12 +5,15 @@
 //   songs/{songId}                 곡 정보 · 문장 · 타이밍
 //   songs/{songId}/scores/{uid}    친구별 점수 (모두가 봄)
 //   users/{uid}/progress/{songId}  내 진도 · 내가 쓴 답 (나만 봄)
+//   requests/{uid}                 초대 안 된 사람의 승인 요청 (관리자만 봄)
 //   users/{uid}/meta/profile       내 닉네임 (친구들 기록에는 이 이름이 보여요)
 
 import { useSyncExternalStore } from 'react'
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
 import { getDb } from './firebase'
 import type { Difficulty, Song, SongProgress, User, VocabProgress } from './types'
+
+export type AccessRequest = { uid: string; email: string; name: string; createdAt: number }
 
 type State = {
   ready: boolean
@@ -19,12 +22,14 @@ type State = {
   /** 곡별 마지막으로 공부한 시각 (ms) — 이어서 하기에 써요 */
   touched: Record<string, number>
   invites: string[]
+  /** 승인 요청 (관리자만) */
+  requests: AccessRequest[]
   /** 단어장 진도 (나만 봄) */
   vocab: VocabProgress
   error: string | null
 }
 
-const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], vocab: { words: {}, kana: {} }, error: null }
+const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], vocab: { words: {}, kana: {} }, error: null }
 let state: State = empty
 let me: User | null = null
 let unsubs: (() => void)[] = []
@@ -107,6 +112,16 @@ export function startSync(user: User) {
         (s) => set({ invites: ((s.data()?.emails as string[] | undefined) ?? []).slice() }),
         () => {},
       ),
+      onSnapshot(
+        collection(db, 'requests'),
+        (snap) =>
+          set({
+            requests: snap.docs
+              .map((d) => ({ uid: d.id, email: String(d.data().email ?? ''), name: String(d.data().name ?? ''), createdAt: Number(d.data().createdAt ?? 0) }))
+              .sort((a, b) => a.createdAt - b.createdAt),
+          }),
+        () => {},
+      ),
     )
   }
 }
@@ -123,6 +138,28 @@ export async function isInvited(email: string) {
   const s = await getDoc(doc(getDb(), 'config', 'access'))
   const emails = ((s.data()?.emails as string[] | undefined) ?? []).map((e) => e.toLowerCase())
   return emails.includes(email.toLowerCase())
+}
+
+/** 초대 안 된 사람: 내 승인 요청 보내기 / 확인 / 승인되면 알림 */
+export async function sendAccessRequest(uid: string, email: string, name: string) {
+  await setDoc(doc(getDb(), 'requests', uid), { email: email.toLowerCase(), name: name.trim().slice(0, 20), createdAt: Date.now() })
+}
+export async function hasAccessRequest(uid: string) {
+  try {
+    return (await getDoc(doc(getDb(), 'requests', uid))).exists()
+  } catch {
+    return false
+  }
+}
+export function watchInvited(email: string, cb: () => void) {
+  return onSnapshot(
+    doc(getDb(), 'config', 'access'),
+    (s) => {
+      const emails = ((s.data()?.emails as string[] | undefined) ?? []).map((e) => e.toLowerCase())
+      if (emails.includes(email.toLowerCase())) cb()
+    },
+    () => {},
+  )
 }
 
 type Pair = { ok: number; total: number }
@@ -229,6 +266,15 @@ export const actions = {
       }),
     )
     return name
+  },
+  /** 승인: 초대 목록에 넣고 요청을 지워요 */
+  async approveRequest(r: AccessRequest) {
+    const email = r.email.toLowerCase()
+    if (!state.invites.includes(email)) await setDoc(doc(getDb(), 'config', 'access'), { emails: [...state.invites, email] })
+    await deleteDoc(doc(getDb(), 'requests', r.uid))
+  },
+  async rejectRequest(uid: string) {
+    await deleteDoc(doc(getDb(), 'requests', uid))
   },
   async setInvites(emails: string[]) {
     await setDoc(doc(getDb(), 'config', 'access'), { emails })

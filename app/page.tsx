@@ -176,7 +176,7 @@ export default function Page() {
     return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   }
   if (auth === 'out') return <Login onLogin={login} busy={loginBusy} error={loginError} />
-  if (auth === 'not-invited') return <NotInvited email={email} onLogout={logout} />
+  if (auth === 'not-invited') return <NotInvited email={email} uid={getFirebaseAuth().currentUser?.uid ?? ''} onLogout={logout} onApproved={() => window.location.reload()} />
   if (!user) return null
   if (nickOpen) {
     const first = !user.name

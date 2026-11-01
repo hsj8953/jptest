@@ -22,7 +22,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onNew: () => void
   onVocab: () => void
 }) {
-  const { songs, progress, touched, ready, error } = useStore()
+  const { songs, progress, touched, ready, error, requests } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
@@ -55,12 +55,23 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
           {isAdmin && (
             <>
-              <Button variant="outline" onClick={onInvite} className="h-10 px-3"><UserPlus data-icon="inline-start" />친구 초대</Button>
+              <Button variant="outline" onClick={onInvite} className="relative h-10 px-3">
+                <UserPlus data-icon="inline-start" />친구 초대
+                {requests.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-5 text-white">{requests.length}</span>}
+              </Button>
               <Button onClick={onNew} className="h-10 px-3"><Plus data-icon="inline-start" />새 곡 등록</Button>
             </>
           )}
         </div>
       </div>
+
+      {isAdmin && requests.length > 0 && (
+        <button onClick={onInvite} className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-left text-sm transition hover:bg-primary/15">
+          <UserPlus className="size-4 shrink-0 text-primary" />
+          <span className="flex-1"><b>승인 요청 {requests.length}건</b>이 기다리고 있어요.</span>
+          <span className="text-xs font-semibold text-primary">확인하기 →</span>
+        </button>
+      )}
 
       {recent && recentSong && (
         <ContinueBanner
