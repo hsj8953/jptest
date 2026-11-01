@@ -90,8 +90,8 @@ export function NotInvited({ email, uid, onLogout, onApproved }: { email: string
             <p className="mt-3 text-sm leading-6 text-muted-foreground">관리자에게 승인을 요청하면, 승인된 뒤 바로 들어갈 수 있어요.</p>
             <p className="mt-4 rounded-lg bg-muted px-3 py-2 font-mono text-sm">{email}</p>
             <form onSubmit={send} className="mt-4 text-left">
-              <label htmlFor="req-name" className="text-sm font-semibold">관리자가 알아볼 이름 <span className="font-normal text-muted-foreground">(선택)</span></label>
-              <input id="req-name" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 같은 반 민수" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 outline-none focus:ring-2 focus:ring-ring" />
+              <label htmlFor="req-name" className="text-sm font-semibold">관리자에게 보여줄 닉네임 <span className="font-normal text-muted-foreground">(선택)</span></label>
+              <input id="req-name" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="예: 하루" className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 outline-none focus:ring-2 focus:ring-ring" />
               {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
               <Button type="submit" disabled={state !== 'none'} className="mt-3 h-11 w-full">{state === 'sending' ? '보내는 중…' : '승인 요청하기'}</Button>
             </form>

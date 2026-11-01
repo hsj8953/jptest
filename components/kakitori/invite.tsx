@@ -38,7 +38,7 @@ export function Invite({ onBack }: { onBack: () => void }) {
           {requests.map((r) => (
             <div key={r.uid} className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/60 px-3 py-3 text-sm">
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{r.name || '(이름 없음)'}</span>
+                <span className="block truncate font-medium">{r.name || '(닉네임 없음)'}</span>
                 <span className="block truncate text-xs text-muted-foreground">{r.email}{r.createdAt ? ` · ${new Date(r.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}</span>
               </span>
               <Button size="sm" variant="outline" onClick={() => actions.rejectRequest(r.uid).catch(() => setMsg('처리하지 못했어요. 다시 시도해 주세요.'))}><X data-icon="inline-start" />거절</Button>
