@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Trash2, UserPlus } from 'lucide-react'
+import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -25,6 +25,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   const { songs, progress, touched, ready, error, requests } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [q, setQ] = useState('')
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
   // 곡 × 난이도별 진행 상황
   const stat = (song: Song, d: Difficulty) => {
@@ -42,6 +43,11 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
     const x = stat(s, d)
     return x.total > 0 && x.ok === x.total
   })).length
+
+  // 검색: 제목·가수에서 찾아요 (대소문자, 히라가나/가타카나, 띄어쓰기 구분 없이)
+  const norm = (t: string) => t.toLowerCase().replace(/[\s\u3000]+/g, '').replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+  const nq = norm(q)
+  const shown = nq ? sorted.filter((s) => norm(`${s.title} ${s.artist}`).includes(nq)) : sorted
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
@@ -83,10 +89,29 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         />
       )}
 
-      <div className="mb-8 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3">
-        <Stat label="전체 곡" value={songs.length} />
-        <Stat label="맞힌 문장" value={solved} />
-        <Stat label="다 맞힌 곡" value={finished} />
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="grid grid-cols-3 gap-2 sm:max-w-md sm:flex-1 sm:gap-3">
+          <Stat label="전체 곡" value={songs.length} />
+          <Stat label="맞힌 문장" value={solved} />
+          <Stat label="다 맞힌 곡" value={finished} />
+        </div>
+        <label className="relative sm:ml-auto sm:w-72">
+          <span className="sr-only">노래 검색</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            id="song-search"
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="곡 제목이나 가수로 찾기"
+            className="h-11 w-full rounded-xl border border-input bg-card pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring [&::-webkit-search-cancel-button]:hidden"
+          />
+          {q && (
+            <button type="button" onClick={() => setQ('')} className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="검색어 지우기">
+              <X className="size-4" />
+            </button>
+          )}
+        </label>
       </div>
 
       {error && <p className="mb-4 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
@@ -99,8 +124,12 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         </div>
       )}
 
+      {ready && sorted.length > 0 && shown.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">‘{q.trim()}’ 에 맞는 곡이 없어요.</p>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
-        {sorted.map((song) => {
+        {shown.map((song) => {
           const n = song.lines.length
           const stats = DIFFICULTIES.map((d) => stat(song, d))
           const started = stats.some((x) => x.ok > 0 || Object.keys(progress[progKey(song.id, x.d)] ?? {}).length > 0)
