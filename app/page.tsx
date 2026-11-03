@@ -15,20 +15,22 @@ import { actions, isInvited, loadNickname, startSync, stopSync, useStore } from 
 import { NicknameForm } from '@/components/kakitori/nickname'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
+import { WrongNote } from '@/components/kakitori/wrong-note'
+import { wrongItems } from '@/lib/wrong'
 
-type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab'
+type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab' | 'wrong'
 type AuthState = 'loading' | 'out' | 'not-invited' | 'in'
-type Route = { view: View; id: string | null; line?: number | null; d?: Difficulty | null }
+type Route = { view: View; id: string | null; line?: number | null; d?: Difficulty | null; w?: boolean }
 const DIFFS: Difficulty[] = ['easy', 'normal', 'hard']
 
 // 화면 위치를 주소(?v=study&song=곡ID)에 기록해서 새로고침 · 뒤로가기 · 링크 공유가 되게 해요
-const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab']
+const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab', 'wrong']
 function readRoute(): Route {
   const p = new URLSearchParams(window.location.search)
   const v = p.get('v') as View | null
   const line = p.get('line')
   const d = p.get('d') as Difficulty | null
-  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song'), line: line != null && /^\d+$/.test(line) ? Number(line) : null, d: d && DIFFS.includes(d) ? d : null }
+  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song'), line: line != null && /^\d+$/.test(line) ? Number(line) : null, d: d && DIFFS.includes(d) ? d : null, w: p.get('w') === '1' }
 }
 function routeUrl(r: Route) {
   if (r.view === 'library') return window.location.pathname
@@ -36,6 +38,7 @@ function routeUrl(r: Route) {
   if (r.id) p.set('song', r.id)
   if (r.line != null) p.set('line', String(r.line))
   if (r.d) p.set('d', r.d)
+  if (r.w) p.set('w', '1')
   return `${window.location.pathname}?${p.toString()}`
 }
 
@@ -74,11 +77,12 @@ export default function Page() {
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const [loginError, setLoginError] = useState('')
-  const { songs, ready } = useStore()
+  const { songs, ready, progress } = useStore()
   const [view, setView] = useState<View>('library')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [line, setLine] = useState<number | null>(null)
   const [diff, setDiff] = useState<Difficulty | null>(null)
+  const [wrongQueue, setWrongQueue] = useState(false)
   const { dark, toggle } = useDarkMode()
 
   useEffect(() => {
@@ -88,6 +92,7 @@ export default function Page() {
       setSelectedId(r.id)
       setLine(r.line ?? null)
       setDiff(r.d ?? null)
+      setWrongQueue(!!r.w)
     }
     apply()
     const onPop = () => {
@@ -198,8 +203,9 @@ export default function Page() {
 
   const isAdmin = user.isAdmin
   const selected = songs.find((s) => s.id === selectedId)
-  const go = (v: View, id: string | null = selectedId, ln: number | null = null, d: Difficulty | null = null) => {
-    const url = routeUrl({ view: v, id, line: ln, d })
+  const go = (v: View, id: string | null = selectedId, ln: number | null = null, d: Difficulty | null = null, w = false) => {
+    const url = routeUrl({ view: v, id, line: ln, d, w })
+    setWrongQueue(w)
     if (url !== window.location.pathname + window.location.search) window.history.pushState(null, '', url)
     setSelectedId(id)
     setLine(ln)
@@ -208,6 +214,20 @@ export default function Page() {
     window.scrollTo(0, 0)
   }
   const goLibrary = () => go('library', null)
+  // 오답 노트 '연달아 풀기': 지금 문장을 빼고 다음 오답으로 (없으면 노트로)
+  const nextWrong = () => {
+    const all = wrongItems(songs, progress, isAdmin)
+    const order = [...songs].sort((a, b) => b.createdAt - a.createdAt).map((x) => x.id)
+    const DI: Record<string, number> = { easy: 0, normal: 1, hard: 2 }
+    const key = (id: string, ln: number, d: string) => [order.indexOf(id), ln, DI[d] ?? 0]
+    const cur = key(selectedId ?? '', line ?? 0, diff ?? 'hard')
+    const after = (k: number[]) => k[0] > cur[0] || (k[0] === cur[0] && (k[1] > cur[1] || (k[1] === cur[1] && k[2] > cur[2])))
+    const rest = all.filter((x) => !(x.song.id === selectedId && x.line === line && x.d === diff))
+    // 지금 문장 다음 것부터, 끝까지 가면 처음으로 돌아가요
+    const n = rest.find((x) => after(key(x.song.id, x.line, x.d))) ?? rest[0]
+    if (n) go('study', n.song.id, n.line, n.d, true)
+    else go('wrong', null)
+  }
   const library = (
     <Library
       isAdmin={isAdmin}
@@ -217,6 +237,7 @@ export default function Page() {
       onInvite={() => go('invite', null)}
       onNew={() => go('editor', null)}
       onVocab={() => go('vocab', null)}
+      onWrong={() => go('wrong', null)}
     />
   )
 
@@ -224,6 +245,7 @@ export default function Page() {
   const needsSong = view === 'study' || view === 'timing' || (view === 'editor' && !!selectedId)
   if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
+  else if (view === 'wrong') body = <WrongNote isAdmin={isAdmin} onBack={goLibrary} onOpen={(it, q) => go('study', it.song.id, it.line, it.d, q)} />
   else if (view === 'vocab') body = <Vocab isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
   else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? 'new'} song={selected} onBack={goLibrary} onSaved={(id) => go('timing', id)} />
   else if (view === 'timing' && isAdmin && selected) body = <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
@@ -232,13 +254,14 @@ export default function Page() {
   else if (view === 'study' && selected && diff)
     body = (
       <Study
-        key={`${selected.id}-${diff}-${line ?? ''}`}
+        key={`${selected.id}-${diff}-${line ?? ''}-${wrongQueue ? 'w' : ''}`}
         song={selected}
         user={user}
         difficulty={diff}
         initialLine={line}
-        onBack={goLibrary}
+        onBack={wrongQueue ? () => go('wrong', null) : goLibrary}
         onChangeDifficulty={() => go('study', selected.id, null, null)}
+        onNextWrong={wrongQueue ? nextWrong : undefined}
       />
     )
 

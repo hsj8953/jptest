@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -10,10 +10,11 @@ import type { Song } from '@/lib/types'
 import { ProgressBar } from './furigana'
 import { ContinueBanner } from './continue-banner'
 import { ThemedCard } from './themed'
+import { wrongItems } from '@/lib/wrong'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -21,11 +22,13 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onInvite: () => void
   onNew: () => void
   onVocab: () => void
+  onWrong: () => void
 }) {
   const { songs, progress, touched, ready, error, requests } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  const wrongCount = useMemo(() => wrongItems(songs, progress, isAdmin).length, [songs, progress, isAdmin])
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
   // 곡 × 난이도별 진행 상황
   const stat = (song: Song, d: Difficulty) => {
@@ -59,6 +62,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
+          <Button variant="outline" onClick={onWrong} className="h-10 px-3"><NotebookPen data-icon="inline-start" />오답 노트{wrongCount > 0 && <span className="ml-0.5 rounded-full bg-destructive/10 px-1.5 text-xs font-bold text-destructive tabular-nums">{wrongCount}</span>}</Button>
           {isAdmin && (
             <>
               <Button variant="outline" onClick={onInvite} className="relative h-10 px-3">

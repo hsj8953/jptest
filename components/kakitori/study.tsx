@@ -19,13 +19,15 @@ type Result = { ok: boolean; input: string; revealed: boolean }
 
 const HINT_KEY = 'kakitori.hint.listen.v1'
 
-export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty }: {
+export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty, onNextWrong }: {
   song: Song
   user: User
   onBack: () => void
   initialLine?: number | null
   difficulty?: Difficulty
   onChangeDifficulty?: () => void
+  /** 오답 노트에서 '연달아 풀기'로 들어왔을 때: 다음 오답으로 */
+  onNextWrong?: () => void
 }) {
   const { progress } = useStore()
   const prog = progress[progKey(song.id, difficulty)] ?? {}
@@ -205,7 +207,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     setResult({ ok, input, revealed: false })
   }
   const reveal = () => {
-    save({ ...prog, [current]: { ...p, revealed: true, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation } })
+    save({ ...prog, [current]: { ...p, revealed: true, last: false, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation } })
     setResult({ ok: false, input: normalizeAnswer(answer), revealed: true })
   }
   const retry = () => {
@@ -214,7 +216,9 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   }
 
   const isLast = current === total - 1
-  const nextButton = isLast && allDone ? (
+  const nextButton = onNextWrong ? (
+    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={onNextWrong}>다음 오답<ChevronRight data-icon="inline-end" /></Button>
+  ) : isLast && allDone ? (
     <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
   ) : isLast ? (
     <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={() => move(firstUndone)}>안 푼 문장으로<ChevronRight data-icon="inline-end" /></Button>
@@ -411,7 +415,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
               mode={difficulty}
               prev={p}
               onGrade={(ok, answers, ko) => save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, blanks: answers, translation: ko } })}
-              onReveal={(ko) => save({ ...prog, [current]: { ...p, revealed: true, translation: ko || p.translation } })}
+              onReveal={(ko) => save({ ...prog, [current]: { ...p, revealed: true, last: false, translation: ko || p.translation } })}
               nav={(g, retryFn) => navButtons(!!g?.ok, retryFn)}
             />
           ) : (
