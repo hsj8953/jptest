@@ -7,7 +7,7 @@ import { actions, countCorrectIn, progKey, scoreFor, useStore, watchScores, type
 import { answerOf, normalizeAnswer, normalizeKanji, sameAnswer, stripSpaces } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
-import { DIFFICULTY_LABEL, type Difficulty, type Song, type User } from '@/lib/types'
+import { DIFFICULTY_LABEL, type Difficulty, type LineProgress, type Song, type User } from '@/lib/types'
 import { gradedLines } from '@/lib/blanks'
 import { BlankCard, ListenOnlyCard } from './blank-card'
 import { BlankResults } from './blank-results'
@@ -15,7 +15,7 @@ import { BackButton, Furigana, ProgressBar } from './furigana'
 import { themeStyle, useSongHue } from '@/lib/theme'
 import { Results } from './results'
 
-type Result = { ok: boolean; input: string; revealed: boolean }
+type Result = { ok: boolean; input: string; revealed: boolean; restored?: boolean }
 
 const HINT_KEY = 'kakitori.hint.listen.v1'
 
@@ -40,9 +40,18 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     if (initialLine != null && initialLine >= 0 && initialLine < total) return initialLine
     return graded.find((k) => !prog[k]?.ok) ?? graded[0] ?? 0
   })
-  const [answer, setAnswer] = useState('')
-  const [translation, setTranslation] = useState('')
-  const [result, setResult] = useState<Result | null>(null)
+  // 예전에 풀었던 문장이면 내가 썼던 답·해석과 채점 결과를 그대로 보여 줘요
+  const savedResult = (q?: LineProgress): Result | null => {
+    if (!q) return null
+    const input = normalizeAnswer(q.answer ?? '')
+    if (q.revealed && q.last !== true) return { ok: false, input, revealed: true, restored: true }
+    if (q.last === true || q.last === false) return input ? { ok: q.last, input, revealed: false, restored: true } : null
+    if (q.ok && input) return { ok: true, input, revealed: false, restored: true }
+    return null
+  }
+  const [answer, setAnswer] = useState(() => prog[current]?.answer ?? '')
+  const [translation, setTranslation] = useState(() => prog[current]?.translation ?? '')
+  const [result, setResult] = useState<Result | null>(() => (difficulty === 'hard' ? savedResult(prog[current]) : null))
   const [repeat, setRepeat] = useState(false)
   const [speed, setSpeed] = useState('1')
   const [showResults, setShowResults] = useState(false)
@@ -117,10 +126,12 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   }
 
   const reviewAt = (k: number) => {
+    // 쓰다 만 답이 있으면 그걸, 없으면 예전에 제출한 답을 보여 줘요
     const d = drafts.current[k]
-    setAnswer(d?.answer ?? '')
-    setTranslation(d?.translation ?? '')
-    setResult(null)
+    const q = prog[k]
+    setAnswer(d?.answer ?? q?.answer ?? '')
+    setTranslation(d?.translation ?? q?.translation ?? '')
+    setResult(d ? null : savedResult(q))
     setCurrent(k)
     setShowResults(false)
     window.scrollTo(0, 0)
@@ -183,10 +194,12 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     if (k < 0 || k >= total) return
     drafts.current[current] = { answer, translation }
     yt.stop()
+    // 쓰다 만 답이 있으면 그걸, 없으면 예전에 제출한 답을 보여 줘요
     const d = drafts.current[k]
-    setAnswer(d?.answer ?? '')
-    setTranslation(d?.translation ?? '')
-    setResult(null)
+    const q = prog[k]
+    setAnswer(d?.answer ?? q?.answer ?? '')
+    setTranslation(d?.translation ?? q?.translation ?? '')
+    setResult(d ? null : savedResult(q))
     setNeedKo(false)
     setCurrent(k)
   }
@@ -320,9 +333,9 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
               <label htmlFor="jp-answer" className="text-sm font-semibold">일본어 받아쓰기 <span className="font-normal text-destructive">*</span></label>
               {result && !result.revealed && <span className={result.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{result.ok ? '〇 정답' : '✕ 오답'}</span>}
             </div>
-            <div className={`relative ${result && !result.revealed ? (result.ok ? 'answer-ok' : 'answer-no stamp-shake') : ''}`} key={`wrap-${current}-${p.tries ?? 0}`}>
+            <div className={`relative ${result && !result.revealed ? (result.ok ? 'answer-ok' : result.restored ? 'answer-no' : 'answer-no stamp-shake') : ''} ${result?.restored ? 'restored' : ''}`} key={`wrap-${current}-${p.tries ?? 0}`}>
             {result && !result.revealed && (
-              <span className={`hanko ${result.ok ? 'hanko-ok' : 'hanko-no'}`} role="img" aria-label={result.ok ? '정답 도장' : '오답 도장'}>
+              <span className={`hanko ${result.ok ? 'hanko-ok' : 'hanko-no'} ${result.restored ? 'hanko-static' : ''}`} role="img" aria-label={result.ok ? '정답 도장' : '오답 도장'}>
                 <svg viewBox="0 0 100 100" aria-hidden="true">
                   <circle className="hanko-rim" cx="50" cy="50" r="45" />
                   {result.ok ? (

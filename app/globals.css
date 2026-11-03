@@ -413,3 +413,7 @@
   background-size: auto, auto, 24px 24px, 24px 24px;
   background-attachment: fixed;
 }
+
+/* 예전에 푼 문장을 다시 열 때: 도장은 애니메이션 없이 찍힌 채로 보여 줘요 */
+.hanko-static, .hanko-static *, .restored, .restored textarea { animation: none !important; }
+.hanko-static .hanko-mark { stroke-dashoffset: 0 !important; }

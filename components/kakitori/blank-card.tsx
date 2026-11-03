@@ -9,9 +9,9 @@ import type { LineProgress, Song } from '@/lib/types'
 import { Furigana } from './furigana'
 
 /** 채점 도장 (〇 정답 / ✕ 오답) */
-export function Hanko({ ok }: { ok: boolean }) {
+export function Hanko({ ok, still = false }: { ok: boolean; still?: boolean }) {
   return (
-    <span className={`hanko ${ok ? 'hanko-ok' : 'hanko-no'}`} role="img" aria-label={ok ? '정답 도장' : '오답 도장'}>
+    <span className={`hanko ${ok ? 'hanko-ok' : 'hanko-no'} ${still ? 'hanko-static' : ''}`} role="img" aria-label={ok ? '정답 도장' : '오답 도장'}>
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <circle className="hanko-rim" cx="50" cy="50" r="45" />
         {ok ? (
@@ -28,7 +28,7 @@ export function Hanko({ ok }: { ok: boolean }) {
   )
 }
 
-type Graded = { ok: boolean; revealed: boolean; each: boolean[] }
+type Graded = { ok: boolean; revealed: boolean; each: boolean[]; restored?: boolean }
 
 /**
  * 쉬움(보기 고르기) · 보통(직접 쓰기) 빈칸 문제
@@ -46,11 +46,21 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
   const bl = useMemo(() => blanksFor(song, lineIndex), [song, lineIndex])
   const n = bl.answers.length
   const choices = useMemo(() => (mode === 'easy' ? bl.answers.map((_, b) => choicesFor(song, lineIndex, b)) : []), [mode, bl, song, lineIndex])
-  const [answers, setAnswers] = useState<string[]>(() => Array(n).fill(''))
+  // 예전에 풀었던 문장이면 내가 썼던 답·해석과 채점 결과를 그대로 보여 줘요
+  const prevBlanks = prev?.blanks?.length === n ? prev.blanks : null
+  const [answers, setAnswers] = useState<string[]>(() => prevBlanks ?? Array(n).fill(''))
   const [active, setActive] = useState(0)
-  const [translation, setTranslation] = useState('')
+  const [translation, setTranslation] = useState(prev?.translation ?? '')
   const [needKo, setNeedKo] = useState(false)
-  const [graded, setGraded] = useState<Graded | null>(null)
+  const [graded, setGraded] = useState<Graded | null>(() => {
+    if (!prev) return null
+    if (prev.revealed && prev.last !== true) return { ok: false, revealed: true, each: bl.answers.map(() => false), restored: true }
+    if (prevBlanks && (prev.last === true || prev.last === false)) {
+      const each = bl.answers.map((ans, i) => (mode === 'easy' ? prevBlanks[i] === ans.text : blankCorrect(prevBlanks[i], ans)))
+      return { ok: each.every(Boolean), revealed: false, each, restored: true }
+    }
+    return null
+  })
   const inputs = useRef<(HTMLInputElement | null)[]>([])
   const koRef = useRef<HTMLInputElement>(null)
   const line = song.lines[lineIndex]
@@ -116,8 +126,8 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
         {graded && !graded.revealed && <span className={graded.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{graded.ok ? '〇 정답' : '✕ 오답'}</span>}
       </div>
 
-      <div className={`relative rounded-xl border-2 border-dashed border-border bg-background p-4 pr-24 ${graded && !graded.revealed ? (graded.ok ? 'answer-ok' : 'answer-no stamp-shake') : ''}`}>
-        {graded && !graded.revealed && <Hanko ok={graded.ok} />}
+      <div className={`relative rounded-xl border-2 border-dashed border-border bg-background p-4 pr-24 ${graded && !graded.revealed ? (graded.ok ? 'answer-ok' : graded.restored ? 'answer-no' : 'answer-no stamp-shake') : ''} ${graded?.restored ? 'restored' : ''}`}>
+        {graded && !graded.revealed && <Hanko ok={graded.ok} still={graded.restored} />}
         <p lang="ja" className="jp-writing text-xl leading-[2.6]">
           {bl.parts.map((p, k) => {
             if (p.blank == null) return <span key={k}>{p.text}</span>
