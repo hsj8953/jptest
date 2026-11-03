@@ -68,6 +68,14 @@ export function normalizeAnswer(s: string) {
   return normalizeWidth(normalizeKanji(s)).trim()
 }
 
+/** 띄어쓰기(반각·전각 공백)를 모두 뺀 문장 — 채점은 띄어쓰기를 무시해요 */
+export const stripSpaces = (s: string) => s.replace(/[\s\u3000]+/g, '')
+
+/** 받아쓰기 채점: 띄어쓰기는 무시하고 나머지는 한 글자도 틀리면 안 돼요 */
+export function sameAnswer(input: string, answer: string) {
+  return stripSpaces(normalizeAnswer(input)) === stripSpaces(normalizeAnswer(answer))
+}
+
 /** 채점용 정답 문장 (읽기 표기 제거 + 정리) */
 export function answerOf(ruby: string) {
   return normalizeAnswer(baseText(ruby))

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Headphones, Pause, RotateCcw, Trophy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, progKey, scoreFor, useStore, watchScores, type Score } from '@/lib/store'
-import { answerOf, normalizeAnswer, normalizeKanji } from '@/lib/ruby'
+import { answerOf, normalizeAnswer, normalizeKanji, sameAnswer, stripSpaces } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
 import { DIFFICULTY_LABEL, type Difficulty, type Song, type User } from '@/lib/types'
@@ -200,7 +200,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
       koRef.current?.focus()
       return
     }
-    const ok = input === answerOf(sentence.ruby)
+    const ok = sameAnswer(input, answerOf(sentence.ruby))
     save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim() } })
     setResult({ ok, input, revealed: false })
   }
@@ -493,7 +493,8 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
 }
 
 function DiffView({ answer, input }: { answer: string; input: string }) {
-  const d = diffChars(answer, input)
+  // 띄어쓰기는 채점에서 무시하니까 틀린 글자 표시에서도 빼요
+  const d = diffChars(stripSpaces(answer), stripSpaces(input))
   const draw = (arr: DiffChar[], bad: string) =>
     arr.map((x, k) =>
       x.bad ? (

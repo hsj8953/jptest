@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Eye, RotateCcw, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { answerOf, normalizeAnswer, normalizeKanji, parseRuby } from '@/lib/ruby'
+import { answerOf, normalizeAnswer, normalizeKanji, parseRuby, stripSpaces } from '@/lib/ruby'
 import { diffChars, type DiffChar } from '@/lib/diff'
 import type { Song, SongProgress } from '@/lib/types'
 import { ProgressBar } from './furigana'
@@ -40,8 +40,9 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
   const rows = useMemo<Row[]>(() =>
     song.lines.map((l, index) => {
       const p = progress[index] ?? {}
-      const base = answerOf(l.ruby)
-      const answer = normalizeAnswer(p.answer ?? '')
+      // 띄어쓰기는 채점에서 무시하니까 비교할 때도 빼요
+      const base = stripSpaces(answerOf(l.ruby))
+      const answer = stripSpaces(normalizeAnswer(p.answer ?? ''))
       const { ans, inp } = diffChars(base, answer)
       const matched = ans.filter((c) => !c.bad).length
       const denom = Math.max(Array.from(base).length, Array.from(answer).length)
@@ -172,6 +173,8 @@ function Cell({ label, muted, children }: { label: string; muted?: boolean; chil
 function RubyDiff({ ruby, ans }: { ruby: string; ans: DiffChar[] }) {
   let i = 0
   const mark = (ch: string, key: string) => {
+    // 띄어쓰기는 채점에서 빼서 비교했으니 표시도 건너뛰어요
+    if (/[\s\u3000]/.test(ch)) return <span key={key}>{ch}</span>
     const bad = ans[i++]?.bad
     return bad
       ? <span key={key} className="rounded-sm bg-destructive/15 text-destructive underline decoration-wavy underline-offset-4">{ch}</span>
