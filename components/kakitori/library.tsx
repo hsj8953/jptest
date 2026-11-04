@@ -11,6 +11,7 @@ import { ProgressBar } from './furigana'
 import { ContinueBanner } from './continue-banner'
 import { ThemedCard } from './themed'
 import { wrongItems } from '@/lib/wrong'
+import { InstallBanner } from './install-banner'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
@@ -74,6 +75,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           )}
         </div>
       </div>
+
+      <InstallBanner />
 
       {isAdmin && requests.length > 0 && (
         <button onClick={onInvite} className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-left text-sm transition hover:bg-primary/15">

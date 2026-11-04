@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, LogOut, Menu, Moon, Pencil, Sun, X } from 'lucide-react'
+import { LogOut, Menu, Moon, Pencil, Sun, X } from 'lucide-react'
 import type { User } from '@/lib/types'
+import { AppLogo } from './logo'
 
 export function Header({ user, dark, onHome, onDark, onLogout, onNickname }: { user: User; dark: boolean; onHome: () => void; onDark: () => void; onLogout: () => void; onNickname: () => void }) {
   const [open, setOpen] = useState(false)
@@ -11,7 +12,7 @@ export function Header({ user, dark, onHome, onDark, onLogout, onNickname }: { u
     <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <button onClick={onHome} className="flex items-center gap-2 rounded-lg text-left transition-opacity hover:opacity-80">
-          <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><BookOpen className="size-5" /></span>
+          <AppLogo className="size-9 shrink-0 rounded-xl shadow-sm" />
           <span>
             <span className="block text-sm font-bold tracking-tight">카키토리 노트</span>
             <span className="font-jp text-[11px] text-muted-foreground">書き取りノート</span>

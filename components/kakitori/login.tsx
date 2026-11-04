@@ -1,4 +1,5 @@
-import { BookOpen, Headphones, PenLine, Users } from 'lucide-react'
+import { Headphones, PenLine, Users } from 'lucide-react'
+import { AppLogo } from './logo'
 import { DictationDemo, FloatingKana } from './login-demo'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
@@ -9,8 +10,8 @@ export function Login({ onLogin, busy, error }: { onLogin: () => void; busy?: bo
     <main className="login-bg relative grid min-h-screen place-items-center overflow-hidden px-4 py-10">
       <FloatingKana />
       <div className="relative w-full max-w-sm text-center">
-        <div className="login-rise mx-auto grid size-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-xl" style={{ animationDelay: '0ms' }}>
-          <BookOpen className="size-8" />
+        <div className="login-rise mx-auto size-16 overflow-hidden rounded-2xl shadow-xl" style={{ animationDelay: '0ms' }}>
+          <AppLogo className="size-16" />
         </div>
         <h1 className="login-rise mt-6 text-3xl font-bold tracking-tight" style={{ animationDelay: '80ms' }}>카키토리 노트</h1>
         <p className="login-rise mt-1 font-jp text-sm text-muted-foreground" style={{ animationDelay: '140ms' }}>

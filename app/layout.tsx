@@ -23,6 +23,8 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
+  // 아이폰 '홈 화면에 추가'로 설치했을 때 이름·상단바
+  appleWebApp: { capable: true, title: '카키토리', statusBarStyle: 'default' },
 }
 
 export const viewport: Viewport = {
