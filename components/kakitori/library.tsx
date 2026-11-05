@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { actions, countCorrectIn, parseProgKey, progKey, useStore } from '@/lib/store'
+import { actions, countCorrectIn, parseProgKey, progKey, useStore, type SongRequest } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty } from '@/lib/types'
 import type { Song } from '@/lib/types'
@@ -12,10 +12,11 @@ import { ContinueBanner } from './continue-banner'
 import { ThemedCard } from './themed'
 import { wrongItems } from '@/lib/wrong'
 import { InstallBanner } from './install-banner'
+import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -24,11 +25,13 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onNew: () => void
   onVocab: () => void
   onWrong: () => void
+  onRegisterRequest: (r: SongRequest) => void
 }) {
-  const { songs, progress, touched, ready, error, requests } = useStore()
+  const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  const [reqOpen, setReqOpen] = useState(false)
   const wrongCount = useMemo(() => wrongItems(songs, progress, isAdmin).length, [songs, progress, isAdmin])
   const sorted = [...songs].sort((a, b) => b.createdAt - a.createdAt)
   // 곡 × 난이도별 진행 상황
@@ -64,6 +67,10 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
           <Button variant="outline" onClick={onWrong} className="h-10 px-3"><NotebookPen data-icon="inline-start" />오답 노트{wrongCount > 0 && <span className="ml-0.5 rounded-full bg-destructive/10 px-1.5 text-xs font-bold text-destructive tabular-nums">{wrongCount}</span>}</Button>
+          <Button variant="outline" onClick={() => setReqOpen(true)} className="relative h-10 px-3">
+            <Music2 data-icon="inline-start" />{isAdmin ? '곡 신청 목록' : '곡 신청'}
+            {isAdmin && songRequests.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-5 text-white">{songRequests.length}</span>}
+          </Button>
           {isAdmin && (
             <>
               <Button variant="outline" onClick={onInvite} className="relative h-10 px-3">
@@ -77,6 +84,19 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
       </div>
 
       <InstallBanner />
+      {!isAdmin && <AddedNotice onOpen={(id) => onSelect(id)} />}
+
+      {isAdmin && songRequests.length > 0 && (
+        <button onClick={() => setReqOpen(true)} className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-left text-sm transition hover:bg-primary/15">
+          <Music2 className="size-4 shrink-0 text-primary" />
+          <span className="flex-1"><b>곡 신청 {songRequests.length}건</b>이 들어왔어요.</span>
+          <span className="text-xs font-semibold text-primary">확인하기 →</span>
+        </button>
+      )}
+
+      {reqOpen && (isAdmin
+        ? <SongRequestList onClose={() => setReqOpen(false)} onRegister={(r) => { setReqOpen(false); onRegisterRequest(r) }} />
+        : <SongRequestModal onClose={() => setReqOpen(false)} />)}
 
       {isAdmin && requests.length > 0 && (
         <button onClick={onInvite} className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-left text-sm transition hover:bg-primary/15">

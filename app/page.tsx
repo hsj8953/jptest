@@ -11,7 +11,7 @@ import { Invite } from '@/components/kakitori/invite'
 import { Vocab } from '@/components/kakitori/vocab'
 import { Login, NotInvited, SetupNeeded } from '@/components/kakitori/login'
 import { ADMIN_EMAIL, firebaseConfigured, getFirebaseAuth, googleProvider } from '@/lib/firebase'
-import { actions, isInvited, loadNickname, startSync, stopSync, useStore } from '@/lib/store'
+import { actions, isInvited, loadNickname, startSync, stopSync, useStore, type SongRequest } from '@/lib/store'
 import { NicknameForm } from '@/components/kakitori/nickname'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
@@ -83,6 +83,7 @@ export default function Page() {
   const [line, setLine] = useState<number | null>(null)
   const [diff, setDiff] = useState<Difficulty | null>(null)
   const [wrongQueue, setWrongQueue] = useState(false)
+  const [pendingRequest, setPendingRequest] = useState<SongRequest | null>(null)
   const { dark, toggle } = useDarkMode()
 
   useEffect(() => {
@@ -235,9 +236,10 @@ export default function Page() {
       onEdit={(id) => go('editor', id)}
       onTiming={(id) => go('timing', id)}
       onInvite={() => go('invite', null)}
-      onNew={() => go('editor', null)}
+      onNew={() => { setPendingRequest(null); go('editor', null) }}
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
+      onRegisterRequest={(r) => { setPendingRequest(r); go('editor', null) }}
     />
   )
 
@@ -247,7 +249,7 @@ export default function Page() {
   else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
   else if (view === 'wrong') body = <WrongNote isAdmin={isAdmin} onBack={goLibrary} onOpen={(it, q) => go('study', it.song.id, it.line, it.d, q)} />
   else if (view === 'vocab') body = <Vocab isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
-  else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? 'new'} song={selected} onBack={goLibrary} onSaved={(id) => go('timing', id)} />
+  else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? `new-${pendingRequest?.id ?? ''}`} song={selected} request={selectedId ? null : pendingRequest} onBack={() => { setPendingRequest(null); goLibrary() }} onSaved={(id) => { setPendingRequest(null); go('timing', id) }} />
   else if (view === 'timing' && isAdmin && selected) body = <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
   else if (view === 'study' && selected && !diff)
     body = <DifficultyPicker song={selected} onBack={goLibrary} onPick={(d) => go('study', selected.id, line, d)} />

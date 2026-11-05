@@ -32,6 +32,26 @@ service cloud.firestore {
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
     }
 
+    // 곡 신청: 문서 이름은 유튜브 영상 ID. 신청한 사람과 관리자만 보고,
+    // 같은 곡을 다른 친구가 또 신청하면 신청자 목록에 자기 이름만 더할 수 있어요.
+    match /songRequests/{id} {
+      // 아직 아무도 신청 안 한 곡인지 확인할 수 있게, 없는 문서는 누구나 확인 가능
+      allow get: if isAdmin() || (member() && (resource == null || request.auth.uid in resource.data.requesterUids));
+      allow list: if isAdmin() || (member() && request.auth.uid in resource.data.requesterUids);
+      allow create: if member()
+        && request.resource.data.requesterUids == [request.auth.uid]
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['youtubeId', 'title', 'artist', 'requesterUids', 'requesters', 'status', 'createdAt']);
+      allow update: if isAdmin() || (member()
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['requesterUids', 'requesters'])
+        && request.resource.data.requesterUids.hasAll(resource.data.requesterUids)
+        && request.auth.uid in request.resource.data.requesterUids
+        && request.resource.data.requesterUids.size() <= resource.data.requesterUids.size() + 1
+        && request.resource.data.requesters.size() <= resource.data.requesters.size() + 1);
+      allow delete: if isAdmin();
+    }
+
     // 단어장 음성 설정(목소리)과 음성 파일: 멤버는 듣기만, 만드는 건 관리자만
     match /config/voice {
       allow read: if member();

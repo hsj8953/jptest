@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ChevronRight, Copy, Loader2, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { actions, newSongId } from '@/lib/store'
+import { actions, newSongId, type SongRequest } from '@/lib/store'
 import { generateFurigana } from '@/lib/furigana'
 import { RubyEditable } from './ruby-edit'
 import { KANJI, baseText, normalizeKanji, splitRuby } from '@/lib/ruby'
@@ -19,10 +19,11 @@ import { BackButton, Furigana } from './furigana'
 const splitLines = (t: string) => normalizeKanji(t).split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
 const inputCls = 'mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 font-normal outline-none focus:ring-2 focus:ring-ring'
 
-export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => void; onSaved: (id: string) => void }) {
-  const [title, setTitle] = useState(song?.title ?? '')
-  const [artist, setArtist] = useState(song?.artist ?? '')
-  const [yt, setYt] = useState(song?.youtubeId ? `https://youtu.be/${song.youtubeId}` : '')
+export function Editor({ song, request, onBack, onSaved }: { song?: Song; request?: SongRequest | null; onBack: () => void; onSaved: (id: string) => void }) {
+  // 곡 신청에서 '등록하기'로 들어오면 신청 내용을 미리 채워요
+  const [title, setTitle] = useState(song?.title ?? request?.title ?? '')
+  const [artist, setArtist] = useState(song?.artist ?? request?.artist ?? '')
+  const [yt, setYt] = useState(song?.youtubeId ? `https://youtu.be/${song.youtubeId}` : request ? `https://youtu.be/${request.youtubeId}` : '')
   const [jp, setJp] = useState(song?.lines.map((l) => l.ruby).join('\n') ?? '')
   const [ko, setKo] = useState(song?.lines.map((l) => l.ko).join('\n') ?? '')
   const [rows, setRows] = useState<Line[] | null>(song ? song.lines : null)
@@ -126,6 +127,8 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
         .map((w) => ({ ...w, word: normalizeKanji(w.word).trim(), reading: w.reading.trim(), meaning: w.meaning.trim() }))
         .filter((w) => w.word)
       await actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, words: cleanWords, createdAt: song?.createdAt ?? Date.now() })
+      // 곡 신청으로 만든 곡이면 신청을 '추가됨'으로 (친구에게 알림)
+      if (request && !song) await actions.markSongRequestAdded(request.id, id, title.trim()).catch(() => {})
       // VOICEVOX가 켜져 있으면 이 곡 단어 음성도 같이 만들어요 (꺼져 있으면 그냥 넘어가요)
       const texts = cleanWords.map((w) => w.reading || w.word)
       const voice = texts.length ? await loadVoiceConfig() : null

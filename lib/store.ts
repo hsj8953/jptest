@@ -5,13 +5,27 @@
 //   songs/{songId}                 곡 정보 · 문장 · 타이밍
 //   songs/{songId}/scores/{uid}    친구별 점수 (모두가 봄)
 //   users/{uid}/progress/{songId}  내 진도 · 내가 쓴 답 (나만 봄)
+//   songRequests/{유튜브ID}         곡 신청 (신청한 사람과 관리자만 봄)
 //   requests/{uid}                 초대 안 된 사람의 승인 요청 (관리자만 봄)
 //   users/{uid}/meta/profile       내 닉네임 (친구들 기록에는 이 이름이 보여요)
 
 import { useSyncExternalStore } from 'react'
-import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore'
+import { arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { getDb } from './firebase'
 import type { Difficulty, Song, SongProgress, User, VocabProgress } from './types'
+
+export type SongRequest = { id: string; youtubeId: string; title: string; artist: string; requesters: { uid: string; name: string }[]; createdAt: number; status: 'pending' | 'added'; songId?: string; songTitle?: string }
+const toSongRequest = (id: string, x: Record<string, unknown>): SongRequest => ({
+  id,
+  youtubeId: String(x.youtubeId ?? id),
+  title: String(x.title ?? ''),
+  artist: String(x.artist ?? ''),
+  requesters: Array.isArray(x.requesters) ? (x.requesters as { uid: string; name: string }[]) : [],
+  createdAt: Number(x.createdAt ?? 0),
+  status: x.status === 'added' ? 'added' : 'pending',
+  songId: x.songId ? String(x.songId) : undefined,
+  songTitle: x.songTitle ? String(x.songTitle) : undefined,
+})
 
 export type AccessRequest = { uid: string; email: string; name: string; createdAt: number }
 
@@ -24,12 +38,16 @@ type State = {
   invites: string[]
   /** 승인 요청 (관리자만) */
   requests: AccessRequest[]
+  /** 곡 신청: 관리자는 대기 중인 전체, 친구는 내 신청 중 추가된 것 */
+  songRequests: SongRequest[]
+  /** 친구: 이미 확인한 '추가됐어요' 알림 */
+  seenAdded: string[]
   /** 단어장 진도 (나만 봄) */
   vocab: VocabProgress
   error: string | null
 }
 
-const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], vocab: { words: {}, kana: {} }, error: null }
+const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, error: null }
 let state: State = empty
 let me: User | null = null
 let unsubs: (() => void)[] = []
@@ -105,6 +123,30 @@ export function startSync(user: User) {
       () => {},
     ),
   )
+  if (user.isAdmin) {
+    unsubs.push(
+      onSnapshot(
+        query(collection(db, 'songRequests'), where('status', '==', 'pending')),
+        (snap) => set({ songRequests: snap.docs.map((d) => toSongRequest(d.id, d.data())).sort((a, b) => a.createdAt - b.createdAt) }),
+        () => {},
+      ),
+    )
+  } else {
+    // 내 신청 중에 추가된 곡 → 알림
+    unsubs.push(
+      onSnapshot(
+        // (색인을 따로 안 만들어도 되게 상태는 받아서 걸러요)
+        query(collection(db, 'songRequests'), where('requesterUids', 'array-contains', user.uid)),
+        (snap) => set({ songRequests: snap.docs.map((d) => toSongRequest(d.id, d.data())).filter((r) => r.status === 'added') }),
+        () => {},
+      ),
+      onSnapshot(
+        doc(db, 'users', user.uid, 'meta', 'songRequests'),
+        (s) => set({ seenAdded: ((s.data()?.seen as string[] | undefined) ?? []).slice() }),
+        () => {},
+      ),
+    )
+  }
   if (user.isAdmin) {
     unsubs.push(
       onSnapshot(
@@ -266,6 +308,38 @@ export const actions = {
       }),
     )
     return name
+  },
+  /** 곡 신청 (친구). 같은 영상을 누가 이미 신청했으면 그 신청에 이름만 더해요 */
+  async requestSong(youtubeId: string, title: string, artist: string) {
+    if (!me) throw new Error('unauthorized')
+    const ref = doc(getDb(), 'songRequests', youtubeId)
+    const who = { uid: me.uid, name: me.name }
+    let exists = true
+    try {
+      exists = (await getDoc(ref)).exists()
+    } catch (e) {
+      // 다른 친구가 이미 신청한 곡은 내용을 볼 수 없어서 '권한 없음'이 나와요 → 있는 걸로 봐요
+      if ((e as { code?: string }).code !== 'permission-denied') throw e
+    }
+    if (!exists) {
+      await setDoc(ref, { youtubeId, title: title.trim().slice(0, 80), artist: artist.trim().slice(0, 60), requesterUids: [me.uid], requesters: [who], status: 'pending', createdAt: Date.now() })
+    } else {
+      await updateDoc(ref, { requesterUids: arrayUnion(me.uid), requesters: arrayUnion(who) })
+    }
+  },
+  /** 관리자: 신청한 곡을 등록했어요 → 신청한 친구들에게 알림 */
+  async markSongRequestAdded(requestId: string, songId: string, songTitle: string) {
+    await updateDoc(doc(getDb(), 'songRequests', requestId), { status: 'added', songId, songTitle, addedAt: Date.now() })
+  },
+  async deleteSongRequest(requestId: string) {
+    await deleteDoc(doc(getDb(), 'songRequests', requestId))
+  },
+  /** 친구: '추가됐어요' 알림 닫기 */
+  async dismissAdded(ids: string[]) {
+    if (!me) return
+    const seen = [...new Set([...state.seenAdded, ...ids])].slice(-200)
+    set({ seenAdded: seen })
+    await setDoc(doc(getDb(), 'users', me.uid, 'meta', 'songRequests'), { seen })
   },
   /** 승인: 초대 목록에 넣고 요청을 지워요 */
   async approveRequest(r: AccessRequest) {
