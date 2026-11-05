@@ -1,3 +1,12 @@
+/** 문장 풀이 (AI가 만들고 관리자가 고칠 수 있어요) */
+export type ExplainWord = { w: string; r: string; pos: string; m: string; note?: string }
+export type LineExplain = {
+  words: ExplainWord[]
+  grammar: { title: string; body: string }[]
+  literal: string
+  natural: string
+}
+
 export type Line = {
   /** 후리가나 표기 포함 문장. 예: 夜空{よぞら}に光{ひかり}が */
   ruby: string
@@ -6,6 +15,8 @@ export type Line = {
   start: number | null
   /** 읽기를 다시 확인해야 하는 한자 단어들 (관리자 화면에서만 노랗게 표시) */
   check?: string[]
+  /** 문장 풀이 */
+  explain?: LineExplain
 }
 
 /** 곡에서 뽑은 한자 단어 (단어장용) */

@@ -14,6 +14,7 @@ import { BlankResults } from './blank-results'
 import { BackButton, Furigana, ProgressBar } from './furigana'
 import { themeStyle, useSongHue } from '@/lib/theme'
 import { Results } from './results'
+import { ExplainPanel } from './explain-view'
 
 type Result = { ok: boolean; input: string; revealed: boolean; restored?: boolean }
 
@@ -417,7 +418,10 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
                 <button onClick={reveal} className="h-11 rounded-lg px-4 text-sm text-muted-foreground hover:bg-muted sm:h-10">모르겠어요 · 정답 보기</button>
               </div>
             ) : (
-              navButtons(result.ok, retry)
+              <>
+                <ExplainPanel key={current} line={sentence} />
+                {navButtons(result.ok, retry)}
+              </>
             )}
           </div>
           ) : isGraded(current) ? (

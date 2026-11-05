@@ -7,6 +7,7 @@ import { blankCorrect, blanksFor, choiceReading, choicesFor } from '@/lib/blanks
 import { normalizeKanji } from '@/lib/ruby'
 import type { LineProgress, Song } from '@/lib/types'
 import { Furigana } from './furigana'
+import { ExplainPanel } from './explain-view'
 
 /** 채점 도장 (〇 정답 / ✕ 오답) */
 export function Hanko({ ok, still = false }: { ok: boolean; still?: boolean }) {
@@ -259,7 +260,10 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
           <button onClick={reveal} className="h-11 rounded-lg px-4 text-sm text-muted-foreground hover:bg-muted sm:h-10">모르겠어요 · 정답 보기</button>
         </div>
       ) : (
-        nav(graded, retry)
+        <>
+          <ExplainPanel line={line} />
+          {nav(graded, retry)}
+        </>
       )}
       {prev?.tries && !graded ? <p className="mt-3 text-right text-xs text-muted-foreground">이전 시도 {prev.tries}회{prev.ok ? ' · 맞힌 문장' : ''}</p> : null}
     </div>

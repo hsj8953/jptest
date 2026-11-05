@@ -11,6 +11,7 @@ import { fullyRead, htmlToRuby, parenToRuby } from '@/lib/paste-lyrics'
 import { parseYouTubeId } from '@/lib/youtube'
 import type { Line, Song, SongWord } from '@/lib/types'
 import { WordEditor } from './word-editor'
+import { ExplainEditor } from './explain-editor'
 import { generateAudio, loadVoiceConfig, vvAvailable } from '@/lib/voice'
 import { BackButton, Furigana } from './furigana'
 
@@ -39,10 +40,26 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
     const a = splitLines(jp)
     const b = splitLines(ko)
     const n = Math.max(a.length, b.length)
-    setRows((old) => Array.from({ length: n }, (_, i) => ({ ruby: a[i] ?? '', ko: b[i] ?? '', start: old?.[i]?.start ?? null })))
+    // 같은 자리의 문장이 그대로면 문장 풀이도 유지해요 (후리가나만 바뀐 건 같은 문장으로 봐요)
+    setRows((old) =>
+      Array.from({ length: n }, (_, i) => {
+        const prev = old?.[i]
+        const keep = prev?.explain && baseText(prev.ruby) === baseText(a[i] ?? '')
+        return { ruby: a[i] ?? '', ko: b[i] ?? '', start: prev?.start ?? null, ...(keep ? { explain: prev!.explain } : {}) }
+      }),
+    )
     setError('')
   }
-  const edit = (i: number, key: 'ruby' | 'ko', v: string) => setRows((r) => r?.map((l, j) => (j === i ? { ...l, [key]: v } : l)) ?? r)
+  const edit = (i: number, key: 'ruby' | 'ko', v: string) =>
+    setRows((r) =>
+      r?.map((l, j) => {
+        if (j !== i) return l
+        const next = { ...l, [key]: v }
+        // 일본어 문장이 바뀌면 예전 풀이는 맞지 않으니 지워요
+        if (key === 'ruby' && l.explain && baseText(l.ruby) !== baseText(v)) delete next.explain
+        return next
+      }) ?? r,
+    )
 
   // 가사 사이트에서 후리가나째 복사하면 노래에서 부르는 읽기 그대로 들어가요
   const [pasteMsg, setPasteMsg] = useState('')
@@ -97,7 +114,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
 
   const save = async () => {
     const youtubeId = yt.trim() ? parseYouTubeId(yt) : null
-    const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: normalizeKanji(l.ruby).trim(), ko: l.ko.trim(), start: l.start ?? null, ...(l.check?.length ? { check: l.check } : {}) }))
+    const lines = (rows ?? []).filter((l) => l.ruby.trim()).map((l) => ({ ruby: normalizeKanji(l.ruby).trim(), ko: l.ko.trim(), start: l.start ?? null, ...(l.check?.length ? { check: l.check } : {}), ...(l.explain ? { explain: l.explain } : {}) }))
     if (!title.trim()) return setError('곡 제목을 적어 주세요.')
     if (ytInvalid) return setError('유튜브 링크 형식을 확인해 주세요.')
     if (!lines.length) return setError('가사를 붙여넣고 ‘문장 나누기’를 눌러 주세요.')
@@ -195,6 +212,7 @@ export function Editor({ song, onBack, onSaved }: { song?: Song; onBack: () => v
       )}
 
       {rows && rows.length > 0 && <WordEditor lines={rows} words={words} onChange={setWords} />}
+      {rows && rows.length > 0 && <ExplainEditor lines={rows} onChange={setRows} />}
 
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
         {error && <p className="mr-auto text-sm text-destructive">{error}</p>}
