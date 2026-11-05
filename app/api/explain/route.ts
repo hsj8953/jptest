@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/server-auth'
 import { callGemini } from '@/lib/gemini'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 130
 
 const PROMPT = `You explain Japanese song lyric lines to Korean learners (from beginners to intermediate).
 For each item you get one Japanese line ("ja") and its official Korean translation ("ko", may be empty).
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     : []
   if (!items.length || items.length > 8) return NextResponse.json({ error: 'bad_request' }, { status: 400 })
 
-  const r = await callGemini(PROMPT, JSON.stringify({ items }), SCHEMA, 55000)
+  const r = await callGemini(PROMPT, JSON.stringify({ items }), SCHEMA, 120000)
   if (!r.ok) return NextResponse.json({ error: r.error, detail: r.detail }, { status: r.status })
   const out = (r.json as { lines?: unknown[] }).lines ?? []
   return NextResponse.json({

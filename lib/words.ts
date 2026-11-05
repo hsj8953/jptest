@@ -49,7 +49,7 @@ export async function fillWordInfo(words: SongWord[], lines: Line[], onProgress?
     const token = await getFirebaseAuth().currentUser?.getIdToken()
     if (!token) throw Object.assign(new Error('unauthorized'), { detail: '' })
     // 작게 나눠 보내요. 실패한 묶음이 있어도 성공한 단어는 남겨요.
-    const CHUNK = 10
+    const CHUNK = 25
     let done = 0
     let failed = 0
     let firstErr: { message: string; detail?: string } | null = null

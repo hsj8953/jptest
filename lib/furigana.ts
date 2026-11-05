@@ -96,8 +96,8 @@ export async function generateFurigana(lines: string[], onProgress?: (done: numb
   try {
     const token = await getFirebaseAuth().currentUser?.getIdToken()
     if (!token) throw Object.assign(new Error('unauthorized'), { detail: '' })
-    // 6줄씩 작게 나눠 보내요. 실패한 묶음이 있어도 성공한 줄은 AI 결과를 써요.
-    const CHUNK = 6
+    // 15줄씩 나눠 보내요 (요청 수를 줄여 무료 한도를 아껴요). 실패한 묶음이 있어도 성공한 줄은 AI 결과를 써요.
+    const CHUNK = 15
     const starts: number[] = []
     for (let i = 0; i < lines.length; i += CHUNK) starts.push(i)
     let done = 0

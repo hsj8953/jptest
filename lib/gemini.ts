@@ -26,7 +26,7 @@ function payloadFor(model: string, system: string, user: string, schema: object)
  * 무료 사용량에 맞춘 호출 순서
  * - 바쁨(503)·한도 초과(429): 같은 모델을 붙잡지 않고 바로 다음 모델로 (모델마다 한도가 따로예요)
  * - 모델이 없음(404): 다음 모델로
- * - 전체 시간은 budgetMs 안에서 끝내요 (Netlify 서버 제한 약 26초)
+ * - 전체 시간은 budgetMs 안에서 끝내요 (Vercel 무료는 요청당 최대 300초)
  */
 export async function callGemini(system: string, user: string, schema: object, budgetMs = 24000, models: string[] = uniq(DEFAULT_MODELS)): Promise<GeminiResult> {
   const key = process.env.GEMINI_API_KEY

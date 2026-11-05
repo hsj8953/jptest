@@ -6,7 +6,7 @@ import { postAi, type AiError } from './ai-client'
 import { answerOf } from './ruby'
 import type { Line, LineExplain } from './types'
 
-const CHUNK = 4
+const CHUNK = 8
 
 export async function generateExplain(lines: Line[], onProgress?: (done: number, total: number, note?: string) => void) {
   const out: (LineExplain | undefined)[] = lines.map((l) => l.explain)
