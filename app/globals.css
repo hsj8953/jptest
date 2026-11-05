@@ -417,3 +417,6 @@
 /* 예전에 푼 문장을 다시 열 때: 도장은 애니메이션 없이 찍힌 채로 보여 줘요 */
 .hanko-static, .hanko-static *, .restored, .restored textarea { animation: none !important; }
 .hanko-static .hanko-mark { stroke-dashoffset: 0 !important; }
+
+/* 화면을 끝까지 쓸 때(viewport-fit=cover) 내용이 제스처 바·홈 표시줄에 가리지 않게 아래 여백을 둬요 */
+body { padding-bottom: env(safe-area-inset-bottom); }
