@@ -42,7 +42,8 @@ export function ListenAlong({ song, children }: { song: Song; children: (p: { cu
     const wide = window.matchMedia('(min-width: 1024px)').matches
     // 좁은 화면: 영상이 헤더(65px) 아래에 붙었을 때의 아래쪽 끝 기준
     const top = wide ? 65 : 65 + (stickyRef.current?.offsetHeight ?? 0)
-    const y = el.getBoundingClientRect().top + window.scrollY - top - 16
+    // 좁은 화면은 아래 공간이 빠듯해서 영상 바로 아래에 붙여요 (6px), 넓은 화면은 16px
+    const y = el.getBoundingClientRect().top + window.scrollY - top - (wide ? 16 : 6)
     window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' })
   }
   const jump = () => {
