@@ -9,7 +9,7 @@ import type { Song } from '@/lib/types'
  * 결과 화면: 노래를 처음부터 끝까지 들으면서 지금 부르는 문장 카드를 강조해요.
  * - 넓은 화면: 왼쪽에 영상 고정, 오른쪽에 카드
  * - 좁은 화면: 영상을 헤더 아래에 고정, 카드는 그 아래에서 스크롤
- * - 자동 스크롤은 기본으로 꺼져 있고, 버튼으로 켜고 끌 수 있어요 (기기마다 기억). '보기'는 한 번만 이동해요.
+ * - 자동 스크롤은 기본으로 켜져 있고, 버튼으로 켜고 끌 수 있어요 (기기마다 기억). '보기'는 한 번만 이동해요.
  * - 카드를 누르면 그 문장부터 재생 (playFrom)
  */
 const AUTO_KEY = 'kakitori.results.autoscroll'
@@ -50,10 +50,11 @@ export function ListenAlong({ song, children }: { song: Song; children: (p: { cu
     if (cur != null) scrollToLine(cur)
   }
 
-  const [auto, setAuto] = useState(false)
+  // 기본은 켜짐. 직접 끈 기기만 꺼진 채로 기억해요
+  const [auto, setAuto] = useState(true)
   useEffect(() => {
     try {
-      setAuto(window.localStorage.getItem(AUTO_KEY) === '1')
+      setAuto(window.localStorage.getItem(AUTO_KEY) !== '0')
     } catch {}
   }, [])
   const toggleAuto = () => {
