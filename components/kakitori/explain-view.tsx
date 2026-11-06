@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BookOpenText, ChevronDown, Volume2 } from 'lucide-react'
 import { speak } from '@/lib/words'
 import type { Line } from '@/lib/types'
@@ -14,23 +14,56 @@ const POS_COLOR: Record<string, string> = {
   부사: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
 }
 
+const TIP_KEY = 'kakitori.hint.explain.v1'
+
 /** 채점한 뒤 보이는 '문장 풀이 보기' (풀이가 없는 문장은 아무것도 안 보여요) */
 export function ExplainPanel({ line }: { line?: Line }) {
   const [open, setOpen] = useState(false)
+  // 처음 한 번만 '여기 문장 풀이가 있어요' 말풍선
+  const [tip, setTip] = useState(false)
   const ex = line?.explain
+  useEffect(() => {
+    if (!ex) return
+    try {
+      if (!window.localStorage.getItem(TIP_KEY)) setTip(true)
+    } catch {}
+  }, [ex])
+  const hideTip = () => {
+    setTip(false)
+    try {
+      window.localStorage.setItem(TIP_KEY, '1')
+    } catch {}
+  }
   if (!ex) return null
   return (
-    <div className="mt-4">
+    <div className="relative mt-4">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          hideTip()
+          setOpen((o) => !o)
+        }}
         aria-expanded={open}
-        className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+        className={`inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 ${tip ? 'listen-pulse' : ''}`}
       >
         <BookOpenText className="size-4" />
         {open ? '문장 풀이 접기' : '문장 풀이 보기'}
         <ChevronDown className={`size-4 transition ${open ? 'rotate-180' : ''}`} />
       </button>
+      {tip && !open && (
+        <div role="note" className="hint-pop relative z-10 mt-3 sm:w-96">
+          <span className="absolute -top-1.5 left-8 size-3 rotate-45 border-l border-t border-primary/40 bg-card" aria-hidden />
+          <div className="rounded-2xl border border-primary/40 bg-card p-4 text-sm shadow-xl">
+            <p className="font-semibold text-foreground">📖 채점이 끝나면 문장 풀이를 볼 수 있어요</p>
+            <ul className="mt-2 flex flex-col gap-1.5 text-muted-foreground">
+              <li>· 단어마다 뜻·품사와 짧은 설명이 있어요.</li>
+              <li>· 이 문장에서 배울 만한 <b className="text-foreground">문법 포인트</b>를 알려 줘요.</li>
+              <li>· 직역·의역을 나란히 보여 줘서 뜻이 어떻게 만들어지는지 알 수 있어요.</li>
+            </ul>
+            <button onClick={hideTip} className="mt-3 w-full rounded-lg bg-primary/10 py-2 text-sm font-semibold text-primary hover:bg-primary/15">알겠어요</button>
+          </div>
+        </div>
+      )}
       {open && <ExplainBody ex={ex} />}
     </div>
   )
