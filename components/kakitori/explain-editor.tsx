@@ -90,7 +90,7 @@ export function ExplainEditor({ lines, onChange }: { lines: Line[]; onChange: (f
                       <button onClick={() => setEditing((e) => !e)} className="rounded-lg border border-border px-2.5 py-1.5 text-xs hover:bg-muted">{editing ? '미리보기' : '고치기'}</button>
                       <button onClick={() => { setEx(i, undefined); setOpen(null) }} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-destructive"><Trash2 className="size-3.5" />풀이 지우기</button>
                     </div>
-                    {editing ? <ExplainForm ex={l.explain} onChange={(ex) => setEx(i, ex)} /> : <ExplainBody ex={l.explain} />}
+                    {editing ? <ExplainForm ex={l.explain} onChange={(ex) => setEx(i, ex)} /> : <ExplainBody ex={l.explain} ruby={l.ruby} />}
                   </div>
                 )}
               </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { BookOpenText, ChevronDown, Volume2 } from 'lucide-react'
 import { speak } from '@/lib/words'
+import { readingsFromRuby } from '@/lib/ruby'
 import type { Line } from '@/lib/types'
 
 const POS_COLOR: Record<string, string> = {
@@ -64,12 +65,15 @@ export function ExplainPanel({ line }: { line?: Line }) {
           </div>
         </div>
       )}
-      {open && <ExplainBody ex={ex} />}
+      {open && <ExplainBody ex={ex} ruby={line?.ruby} />}
     </div>
   )
 }
 
-export function ExplainBody({ ex }: { ex: NonNullable<Line['explain']> }) {
+export function ExplainBody({ ex, ruby }: { ex: NonNullable<Line['explain']>; ruby?: string }) {
+  // 읽기는 가사에 적힌 후리가나(노래에서 부르는 읽기)를 먼저 쓰고, 없으면 AI가 준 읽기
+  const fromLyric = ruby ? readingsFromRuby(ruby, ex.words.map((w) => w.w)) : []
+  const readOf = (i: number) => fromLyric[i] ?? ex.words[i].r
   return (
     <div className="hint-pop mt-3 flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 text-left">
       <section>
@@ -79,14 +83,14 @@ export function ExplainBody({ ex }: { ex: NonNullable<Line['explain']> }) {
             <button
               type="button"
               key={i}
-              onClick={() => speak(w.r || w.w)}
+              onClick={() => speak(readOf(i) || w.w)}
               className="group grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1 rounded-xl bg-muted/50 px-3 py-2 text-left transition hover:bg-muted sm:grid-cols-[minmax(4.5rem,11rem)_3.5rem_1fr_auto]"
               title="눌러서 발음 듣기"
             >
               {/* 휴대폰: 윗줄 단어·품사·소리, 아랫줄 뜻 / 넓은 화면: 한 줄 */}
               <span lang="ja" className="min-w-0 break-all font-jp text-lg leading-tight">
                 {w.w}
-                {w.r && w.r !== w.w && <span className="block text-[11px] text-muted-foreground">{w.r}</span>}
+                {readOf(i) && readOf(i) !== w.w && <span className="block text-[11px] text-muted-foreground">{readOf(i)}</span>}
               </span>
               <span className={`rounded-md px-2 py-0.5 text-center text-[11px] font-semibold sm:px-0 ${POS_COLOR[w.pos] ?? 'bg-muted text-muted-foreground'}`}>{w.pos || '기타'}</span>
               <span className="order-last col-span-3 min-w-0 text-sm sm:order-none sm:col-span-1">

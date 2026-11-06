@@ -80,3 +80,41 @@ export function sameAnswer(input: string, answer: string) {
 export function answerOf(ruby: string) {
   return normalizeAnswer(baseText(ruby))
 }
+
+/**
+ * 문장 풀이의 단어들(w)에 가사 후리가나로 읽기를 붙여요.
+ * 가사에 적힌 후리가나(노래에서 부르는 읽기)를 그대로 쓰고, 가나는 그대로 읽어요.
+ * 단어가 한자 덩어리의 일부만 걸치거나 읽기가 없는 한자가 있으면 null (→ AI가 준 읽기를 써요).
+ */
+export function readingsFromRuby(ruby: string, words: string[]): (string | null)[] {
+  // 글자 하나하나에 읽기 조각을 붙여 둬요: 한자 덩어리는 첫 글자에 덩어리 전체 읽기, 나머지 글자는 '' (덩어리 안)
+  const chars: { ch: string; read: string | null; head: boolean; inBlock: boolean }[] = []
+  for (const seg of splitRuby(normalizeKanji(ruby))) {
+    const cs = Array.from(seg.text)
+    if (seg.kanji) cs.forEach((ch, i) => chars.push({ ch, read: i === 0 ? (seg.reading ?? null) : '', head: i === 0, inBlock: true }))
+    else cs.forEach((ch) => chars.push({ ch, read: /[㐀-鿿々〆]/.test(ch) ? null : ch, head: true, inBlock: false }))
+  }
+  const plain = chars.map((c) => c.ch)
+  let pos = 0
+  return words.map((w) => {
+    const target = Array.from(normalizeKanji(w).replace(/\s+/g, ''))
+    if (!target.length) return null
+    // 앞에서부터 이어서 찾아요 (공백은 건너뛰어요)
+    let start = -1
+    for (let i = pos; i <= plain.length - target.length; i++) {
+      if (target.every((ch, k) => plain[i + k] === ch)) {
+        start = i
+        break
+      }
+    }
+    if (start < 0) return null
+    const end = start + target.length
+    pos = end
+    const span = chars.slice(start, end)
+    // 한자 덩어리 가운데서 시작하거나, 덩어리 중간에서 끝나면 정확한 읽기를 모르니 포기
+    if (!span[0].head) return null
+    if (end < chars.length && chars[end].inBlock && !chars[end].head) return null
+    if (span.some((c) => c.read === null)) return null
+    return span.map((c) => c.read).join('')
+  })
+}

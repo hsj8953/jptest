@@ -45,7 +45,7 @@ const SCHEMA = {
   required: ['lines'],
 }
 
-const HIRA = /^[ぁ-ゟー]*$/
+const HIRA = /^[ぁ-ゟー]*$/ // 히라가나만 (장음 포함)
 const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max)
 
 export async function POST(req: Request) {
@@ -69,7 +69,8 @@ export async function POST(req: Request) {
       return {
         words: l.words.slice(0, 40).map((x) => {
           const w = x as Record<string, unknown>
-          const reading = str(w.r, 40)
+          // 가타카나로 온 읽기도 히라가나로 바꿔서 받아요 (예전엔 버려져서 읽기가 비었어요)
+          const reading = str(w.r, 40).replace(/[\s・]/g, '').replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
           return { w: str(w.w, 40), r: HIRA.test(reading) ? reading : '', pos: str(w.pos, 10), m: str(w.m, 60), note: str(w.note, 80) }
         }).filter((w) => w.w),
         grammar: (Array.isArray(l.grammar) ? l.grammar : []).slice(0, 2).map((x) => {
