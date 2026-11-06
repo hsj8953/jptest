@@ -46,11 +46,8 @@ function units(ruby: string) {
 }
 
 // 빈칸으로 의미 없는 짧은 말(조사·어미·지시어)은 빼요
-const SKIP_KANA = new Set(['から', 'まで', 'より', 'です', 'ます', 'でも', 'けど', 'ので', 'のに', 'だけ', 'ほど', 'など', 'って', 'だよ', 'だね', 'よね', 'かな', 'ない', 'いる', 'ある', 'する', 'なる', 'この', 'その', 'あの', 'それ', 'これ', 'あれ', 'なら', 'たい', 'たら', 'だろう', 'でしょう', 'んだ', 'のよ', 'のね', 'ても', 'では', 'には', 'とは', 'ねえ', 'ため'])
+const SKIP_KANA = new Set(['から', 'まで', 'より', 'です', 'ます', 'でも', 'けど', 'ので', 'のに', 'だけ', 'ほど', 'など', 'って', 'だよ', 'だね', 'よね', 'かな', 'ない', 'いる', 'ある', 'する', 'なる', 'この', 'その', 'あの', 'それ', 'これ', 'あれ', 'なら', 'たい', 'たら', 'だろう', 'でしょう', 'んだ', 'のよ', 'のね', 'ても', 'では', 'には', 'とは', 'ねえ', 'ため', 'しょう', 'でしょう', 'ましょう', 'でしょ', 'ません', 'ました', 'ます', 'だった', 'でした'])
 const KATA = /[\u30A0-\u30FF]/
-// 한자 뒤에 오면 오쿠리가나가 아니라 조사·어미로 보는 글자
-const PARTICLE_START = /[がのにをはへとでもやよねわだぞ]/
-const PARTICLE = /[がのにをはへとでもやよねなわだぞさ]/
 const KANJI_CH = /[\u3400-\u9FFF々〆]/
 const KANA_WORD = /^[\u3041-\u309F\u30A0-\u30FFー]+$/
 const LATIN_WORD = /^[A-Za-z][A-Za-z']+$/
@@ -128,13 +125,10 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
   // 大好き처럼 한자 뒤에 붙은 오쿠리가나까지 한 단어면 빈칸에 같이 넣어요 (だいす|き 로 잘리지 않게)
   const wordEnds = okuriganaEnds(text, song.lines[lineIndex]?.explain?.words.map((w) => w.w))
   const extend = (start: number, end: number) => {
-    let to = wordEnds.get(end)
-    // 단어 나누기로 못 찾으면: 뒤에 붙은 히라가나를 조사가 나오기 전까지 최대 4글자 붙여요 (咲いた, 震える)
-    if (to == null) {
-      to = end
-      while (to < text.length && to - end < 4 && /[\u3041-\u309F]/.test(text[to]) && !(to === end ? PARTICLE_START : PARTICLE).test(text[to])) to++
-      // 조사 바로 앞에서 끝났는데 남은 게 한 글자 っ/ん 처럼 어색하면 그대로 둬요
-    }
+    // 문장 풀이나 브라우저의 단어 나누기로 한 단어라고 확인된 경우에만 오쿠리가나를 붙여요
+    // (글자 모양만 보고 붙이면 夢ならばど 처럼 조사까지 빈칸에 들어가서 뺐어요)
+    const to = wordEnds.get(end)
+    if (to == null) return end
     for (let c = end; c < to; c++) if (covered[c]) return end
     return to
   }
