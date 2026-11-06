@@ -127,7 +127,7 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
         {graded && !graded.revealed && <span className={graded.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{graded.ok ? '〇 정답' : '✕ 오답'}</span>}
       </div>
 
-      <div className={`relative rounded-xl border-2 border-dashed border-border bg-background p-4 pr-24 ${graded && !graded.revealed ? (graded.ok ? 'answer-ok' : graded.restored ? 'answer-no' : 'answer-no stamp-shake') : ''} ${graded?.restored ? 'restored' : ''}`}>
+      <div className={`relative rounded-xl border-2 border-dashed border-border bg-background p-4 ${graded && !graded.revealed ? 'pr-24' : ''} ${graded && !graded.revealed ? (graded.ok ? 'answer-ok' : graded.restored ? 'answer-no' : 'answer-no stamp-shake') : ''} ${graded?.restored ? 'restored' : ''}`}>
         {graded && !graded.revealed && <Hanko ok={graded.ok} still={graded.restored} />}
         <p lang="ja" className="jp-writing text-xl leading-[2.6]">
           {bl.parts.map((p, k) => {
@@ -181,7 +181,8 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
                     else grade()
                   }
                 }}
-                style={{ width }}
+                // 쓴 글자가 길어지면 칸도 같이 늘어나요 (뒤가 잘려 안 보이지 않게)
+                style={{ width: `max(${width}, ${Array.from(answers[b]).length * 1.05 + 2.2}em)`, maxWidth: '100%' }}
                 placeholder={`${b + 1}`}
                 aria-label={`${b + 1}번 빈칸`}
                 className="mx-0.5 inline-block h-10 rounded-lg border-2 border-primary/40 bg-card px-2 text-center align-middle text-lg outline-none focus:border-primary"

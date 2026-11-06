@@ -48,6 +48,9 @@ function units(ruby: string) {
 // 빈칸으로 의미 없는 짧은 말(조사·어미·지시어)은 빼요
 const SKIP_KANA = new Set(['から', 'まで', 'より', 'です', 'ます', 'でも', 'けど', 'ので', 'のに', 'だけ', 'ほど', 'など', 'って', 'だよ', 'だね', 'よね', 'かな', 'ない', 'いる', 'ある', 'する', 'なる', 'この', 'その', 'あの', 'それ', 'これ', 'あれ', 'なら', 'たい', 'たら', 'だろう', 'でしょう', 'んだ', 'のよ', 'のね', 'ても', 'では', 'には', 'とは', 'ねえ', 'ため'])
 const KATA = /[\u30A0-\u30FF]/
+// 한자 뒤에 오면 오쿠리가나가 아니라 조사·어미로 보는 글자
+const PARTICLE_START = /[がのにをはへとでもやよねわだぞ]/
+const PARTICLE = /[がのにをはへとでもやよねなわだぞさ]/
 const KANJI_CH = /[\u3400-\u9FFF々〆]/
 const KANA_WORD = /^[\u3041-\u309F\u30A0-\u30FFー]+$/
 const LATIN_WORD = /^[A-Za-z][A-Za-z']+$/
@@ -78,6 +81,38 @@ function wordUnits(text: string) {
   return out
 }
 
+/**
+ * 한자 덩어리가 끝나는 위치 → 그 단어(오쿠리가나 포함)가 끝나는 위치.
+ * 브라우저의 일본어 단어 나누기로 한 단어인지 보고, 뒤에 붙은 게 히라가나일 때만 늘려요.
+ */
+function okuriganaEnds(text: string, explainWords?: string[]) {
+  const out = new Map<number, number>()
+  const mark = (start: number, end: number) => {
+    // 단어 안에서 한자가 끝나고 히라가나만 남는 지점을 찾아요
+    for (let i = start; i < end - 1; i++) {
+      if (KANJI_CH.test(text[i]) && !KANJI_CH.test(text[i + 1])) {
+        const rest = text.slice(i + 1, end)
+        if (/^[\u3041-\u309F]+$/.test(rest) && !out.has(i + 1)) out.set(i + 1, end)
+      }
+    }
+  }
+  // 1) 문장 풀이가 있으면 그 단어 나누기를 먼저 써요 (咲いた, 会いたくて를 한 단어로 봐요)
+  if (explainWords?.length) {
+    let pos = 0
+    for (const w of explainWords) {
+      const t = normalizeKanji(w).replace(/\s+/g, '')
+      if (!t) continue
+      const at = text.indexOf(t, pos)
+      if (at < 0) continue
+      mark(at, at + t.length)
+      pos = at + t.length
+    }
+  }
+  // 2) 브라우저의 일본어 단어 나누기 (大好き 같은 건 여기서도 잡혀요)
+  if (Segmenter) for (const w of new Segmenter('ja', { granularity: 'word' }).segment(text)) mark(w.index, w.index + w.segment.length)
+  return out
+}
+
 type Cand = { start: number; end: number; text: string; reading: string; score: number }
 
 /** 한 문장의 빈칸 후보 전부 (한자 단어 + 가나 단어 + 영어 단어) */
@@ -90,11 +125,26 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
   const h = (t: string, k: number) => hash(`${song.id}:${lineIndex}:${t}:${k}`) % 10
   const cands: Cand[] = []
   const covered = new Array(text.length).fill(false)
+  // 大好き처럼 한자 뒤에 붙은 오쿠리가나까지 한 단어면 빈칸에 같이 넣어요 (だいす|き 로 잘리지 않게)
+  const wordEnds = okuriganaEnds(text, song.lines[lineIndex]?.explain?.words.map((w) => w.w))
+  const extend = (start: number, end: number) => {
+    let to = wordEnds.get(end)
+    // 단어 나누기로 못 찾으면: 뒤에 붙은 히라가나를 조사가 나오기 전까지 최대 4글자 붙여요 (咲いた, 震える)
+    if (to == null) {
+      to = end
+      while (to < text.length && to - end < 4 && /[\u3041-\u309F]/.test(text[to]) && !(to === end ? PARTICLE_START : PARTICLE).test(text[to])) to++
+      // 조사 바로 앞에서 끝났는데 남은 게 한 글자 っ/ん 처럼 어색하면 그대로 둬요
+    }
+    for (let c = end; c < to; c++) if (covered[c]) return end
+    return to
+  }
   ku.forEach((u, k) => {
     const start = offs[u.from]
-    const end = offs[u.to] + segs[u.to].text.length
+    const end0 = offs[u.to] + segs[u.to].text.length
+    const end = extend(start, end0)
     for (let c = start; c < end; c++) covered[c] = true
-    cands.push({ start, end, text: u.text, reading: u.reading, score: 300 + (words.some((w) => w.includes(u.text) || u.text.includes(w)) ? 100 : 0) + u.text.length * 10 + h(u.text, k) })
+    const okuri = text.slice(end0, end)
+    cands.push({ start, end, text: u.text + okuri, reading: u.reading + okuri, score: 300 + (words.some((w) => w.includes(u.text) || u.text.includes(w)) ? 100 : 0) + u.text.length * 10 + h(u.text, k) })
   })
   // 읽기가 빠진 한자도 빈칸으로 써요 (飛び方처럼 이어진 덩어리째, 보통 모드에선 한자로만 정답)
   for (let i = 0; i < segs.length; i++) {
@@ -102,7 +152,7 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
     let to = i
     while (to + 2 < segs.length && !segs[to + 1].kanji && KANA_GLUE_LOOSE.test(segs[to + 1].text) && segs[to + 2].kanji && !covered[offs[to + 2]]) to += 2
     const start = offs[i]
-    const end = offs[to] + segs[to].text.length
+    const end = extend(start, offs[to] + segs[to].text.length)
     for (let c = start; c < end; c++) covered[c] = true
     const t = text.slice(start, end)
     cands.push({ start, end, text: t, reading: '', score: 150 + Array.from(t).length * 10 + h(t, i) })
@@ -155,7 +205,11 @@ export function readingMap(song: Song) {
   if (hit) return hit
   const m = new Map<string, string>()
   const add = (t: string, r?: string) => { if (r && !m.get(t)) m.set(t, r) }
-  song.lines.forEach((l) => units(l.ruby).units.forEach((u) => add(u.text, u.reading)))
+  song.lines.forEach((l, i) => {
+    units(l.ruby).units.forEach((u) => add(u.text, u.reading))
+    // 오쿠리가나까지 붙은 빈칸(咲いた 등)도 읽기를 알 수 있게
+    candidates(song, i, l.ruby).cands.forEach((c) => add(c.text, c.reading))
+  })
   ;(song.words ?? []).forEach((w) => add(w.word, w.reading))
   Object.entries(FALLBACK_READING).forEach(([t, r]) => add(t, r))
   readingCache.set(song, m)
