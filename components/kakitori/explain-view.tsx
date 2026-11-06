@@ -80,19 +80,20 @@ export function ExplainBody({ ex }: { ex: NonNullable<Line['explain']> }) {
               type="button"
               key={i}
               onClick={() => speak(w.r || w.w)}
-              className="group grid grid-cols-[minmax(4.5rem,auto)_3.5rem_1fr_auto] items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-left transition hover:bg-muted"
+              className="group grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1 rounded-xl bg-muted/50 px-3 py-2 text-left transition hover:bg-muted sm:grid-cols-[minmax(4.5rem,11rem)_3.5rem_1fr_auto]"
               title="눌러서 발음 듣기"
             >
-              <span lang="ja" className="font-jp text-lg leading-tight">
+              {/* 휴대폰: 윗줄 단어·품사·소리, 아랫줄 뜻 / 넓은 화면: 한 줄 */}
+              <span lang="ja" className="min-w-0 break-all font-jp text-lg leading-tight">
                 {w.w}
                 {w.r && w.r !== w.w && <span className="block text-[11px] text-muted-foreground">{w.r}</span>}
               </span>
-              <span className={`rounded-md py-0.5 text-center text-[11px] font-semibold ${POS_COLOR[w.pos] ?? 'bg-muted text-muted-foreground'}`}>{w.pos || '기타'}</span>
-              <span className="min-w-0 text-sm">
+              <span className={`rounded-md px-2 py-0.5 text-center text-[11px] font-semibold sm:px-0 ${POS_COLOR[w.pos] ?? 'bg-muted text-muted-foreground'}`}>{w.pos || '기타'}</span>
+              <span className="order-last col-span-3 min-w-0 text-sm sm:order-none sm:col-span-1">
                 {w.m}
                 {w.note && <span className="mt-0.5 block text-xs text-primary">{w.note}</span>}
               </span>
-              <Volume2 className="size-3.5 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
+              <Volume2 className="size-3.5 text-muted-foreground opacity-60 transition sm:opacity-0 sm:group-hover:opacity-100" />
             </button>
           ))}
         </div>
