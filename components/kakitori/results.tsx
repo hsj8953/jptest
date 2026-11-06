@@ -7,6 +7,7 @@ import { answerOf, normalizeAnswer, normalizeKanji, parseRuby, stripSpaces } fro
 import { diffChars, type DiffChar } from '@/lib/diff'
 import type { Song, SongProgress } from '@/lib/types'
 import { ProgressBar } from './furigana'
+import { ListenAlong, lineCardProps } from './listen-along'
 import { themeStyle, useSongHue } from '@/lib/theme'
 
 type Row = {
@@ -94,12 +95,17 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
         </label>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-4">
+      <ListenAlong song={song}>
+      {({ cur, playFrom }) => (
+      <div className="flex flex-col gap-3">
         {shown.length === 0 && (
           <p className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">틀린 문장이 하나도 없어요. 완벽해요!</p>
         )}
-        {shown.map((r) => (
-          <article key={r.index} className={`rounded-2xl border bg-card p-4 sm:p-5 ${r.ok ? 'border-border' : 'border-destructive/40'}`}>
+        {shown.map((r) => {
+          const lp = lineCardProps(r.index, cur, playFrom)
+          return (
+          <article key={r.index} {...lp} className={`rounded-2xl border bg-card p-4 sm:p-5 ${r.ok ? 'border-border' : 'border-destructive/40'} ${lp.className}`}>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="grid size-7 place-items-center rounded-full bg-muted text-xs font-bold">{r.index + 1}</span>
               <span className={r.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{r.ok ? '〇 정답' : '✕ 오답'}</span>
@@ -131,7 +137,11 @@ export function Results({ song, progress, onBack, onReview, onRestart }: {
               </Cell>
             </div>
           </article>
-        ))}
+          )
+        })}
+      </div>
+      )}
+      </ListenAlong>
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">

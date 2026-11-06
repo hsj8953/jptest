@@ -64,7 +64,9 @@ type Options = {
 export function useYouTube(videoId: string | null | undefined, options: Options = {}) {
   const opts = useRef(options)
   opts.current = options
-  const hostRef = useRef<HTMLDivElement | null>(null)
+  // 플레이어를 넣을 자리. 화면이 바뀌어 자리가 새로 생기면(예: 결과 화면 → 다시 풀기) 플레이어도 새로 만들어요
+  const [host, setHost] = useState<HTMLDivElement | null>(null)
+  const hostRef = useCallback((el: HTMLDivElement | null) => setHost(el), [])
   const player = useRef<any>(null)
   const seg = useRef<Segment | null>(null)
   const [ready, setReady] = useState(false)
@@ -74,7 +76,6 @@ export function useYouTube(videoId: string | null | undefined, options: Options 
   const [duration, setDuration] = useState<number | null>(null)
 
   useEffect(() => {
-    const host = hostRef.current
     if (!videoId || !host) return
     let cancelled = false
     const el = document.createElement('div')
@@ -115,7 +116,7 @@ export function useYouTube(videoId: string | null | undefined, options: Options 
       setPlaying(false)
       setSegActive(false)
     }
-  }, [videoId])
+  }, [videoId, host])
 
   // 0.1초마다 현재 시간 확인 → 구간 끝에서 멈추거나 처음으로 되돌리기
   useEffect(() => {

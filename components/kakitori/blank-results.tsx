@@ -7,6 +7,7 @@ import { blankCorrect, blanksFor } from '@/lib/blanks'
 import { DIFFICULTY_LABEL, type Song, type SongProgress } from '@/lib/types'
 import { themeStyle, useSongHue } from '@/lib/theme'
 import { ProgressBar } from './furigana'
+import { ListenAlong, lineCardProps } from './listen-along'
 
 /** 쉬움·보통 결과: 빈칸마다 맞혔는지, 원래 해석과 내 해석 비교 */
 export function BlankResults({ song, progress, mode, graded, onBack, onReview, onRestart }: {
@@ -73,10 +74,15 @@ export function BlankResults({ song, progress, mode, graded, onBack, onReview, o
         </label>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-4">
+      <ListenAlong song={song}>
+      {({ cur, playFrom }) => (
+      <div className="flex flex-col gap-3">
         {shown.length === 0 && <p className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">틀린 문장이 하나도 없어요. 완벽해요!</p>}
-        {shown.map((r) => (
-          <article key={r.i} className={`rounded-2xl border bg-card p-4 sm:p-5 ${r.ok ? 'border-border' : 'border-destructive/40'}`}>
+        {shown.map((r) => {
+          const lp = lineCardProps(r.i, cur, playFrom)
+          return (
+          <article key={r.i} {...lp} className={`rounded-2xl border bg-card p-4 sm:p-5 ${r.ok ? 'border-border' : 'border-destructive/40'} ${lp.className}`}>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="grid size-7 place-items-center rounded-full bg-muted text-xs font-bold">{r.i + 1}</span>
               <span className={r.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{r.ok ? '〇 정답' : '✕ 오답'}</span>
@@ -114,7 +120,11 @@ export function BlankResults({ song, progress, mode, graded, onBack, onReview, o
               </div>
             </div>
           </article>
-        ))}
+          )
+        })}
+      </div>
+      )}
+      </ListenAlong>
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
