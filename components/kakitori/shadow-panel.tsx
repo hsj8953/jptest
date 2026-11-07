@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Mic, Pause, Play, Square } from 'lucide-react'
-import { canRecord, compareSpeech, getRecognizer, SPEECH_ERR, type Recognizer } from '@/lib/speech'
+import { canRecord, compareSpeech, getRecognizer, loadKanjiDict, SPEECH_ERR, type KanjiDict, type Recognizer } from '@/lib/speech'
 import type { Song } from '@/lib/types'
 import { Furigana } from './furigana'
 
-type Said = { text: string; conf: number }
+type Said = { text: string; conf: number; alts: string[] }
 
 /**
  * 채점한 뒤 보이는 '따라 말하기' (실험 기능)
@@ -46,8 +46,16 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
   const recRef = useRef<Recognizer | null>(null)
   const gotRef = useRef<Said | null>(null)
 
-  // 화면을 떠나면 마이크를 꺼요
-  useEffect(() => () => recRef.current?.abort(), [])
+  // 곡에 없는 한자의 읽기 사전 (처음 펼칠 때 한 번만 받아요)
+  const [dict, setDict] = useState<KanjiDict | undefined>()
+  useEffect(() => {
+    let alive = true
+    loadKanjiDict().then((d) => alive && setDict(d))
+    return () => {
+      alive = false
+      recRef.current?.abort() // 화면을 떠나면 마이크를 꺼요
+    }
+  }, [])
 
   const speak = () => {
     const R = getRecognizer()
@@ -60,13 +68,19 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
     r.lang = 'ja-JP'
     r.interimResults = true
     r.continuous = false
-    r.maxAlternatives = 1
+    r.maxAlternatives = 5
     r.onresult = (e) => {
       let text = ''
       for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript
       setLive(text)
       const last = e.results[e.results.length - 1]
-      if (last.isFinal) gotRef.current = { text, conf: last[0].confidence }
+      if (last.isFinal) {
+        // 앞부분(이미 확정된 결과) + 마지막 결과의 후보들
+        const head = text.slice(0, text.length - last[0].transcript.length)
+        const alts: string[] = []
+        for (let k = 0; k < last.length; k++) alts.push(head + last[k].transcript)
+        gotRef.current = { text, conf: last[0].confidence, alts }
+      }
     }
     r.onerror = (e) => {
       if (e.error !== 'aborted') setErr(SPEECH_ERR[e.error] ?? `음성 인식 오류: ${e.error}`)
@@ -84,8 +98,15 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
     }
   }
 
-  const cmp = said ? compareSpeech(song, ruby, said.text) : null
-  const tone = !cmp ? '' : cmp.score >= 90 ? 'good' : cmp.score >= 60 ? 'mid' : 'low'
+  // 인식기가 준 후보 문장 중 원문과 가장 잘 맞는 걸로 봐요
+  const cmp = said
+    ? said.alts
+        .map((t) => ({ t, r: compareSpeech(song, ruby, t, dict) }))
+        .reduce((a, b) => (b.r.score > a.r.score ? b : a))
+    : null
+  const res = cmp?.r ?? null
+  const best = cmp?.t ?? ''
+  const tone = !res ? '' : res.score >= 90 ? 'good' : res.score >= 60 ? 'mid' : 'low'
 
   return (
     <div className="hint-pop mt-3 rounded-2xl border border-border bg-card p-4 text-left">
@@ -104,28 +125,29 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
           {listening && <p lang="ja" className="mt-3 min-h-8 text-center font-jp text-lg">{live || <span className="font-sans text-sm text-muted-foreground">말해 보세요</span>}</p>}
           {err && <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</p>}
 
-          {cmp && said && !listening && (
+          {res && said && !listening && (
             <div className="hint-pop mt-4 flex flex-col gap-3">
               <div className="flex items-center gap-3">
-                <b className="shrink-0 text-sm">일치 {cmp.score}%</b>
+                <b className="shrink-0 text-sm">일치 {res.score}%</b>
                 <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <span className={`block h-full rounded-full transition-all ${tone === 'good' ? 'bg-emerald-500' : tone === 'mid' ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${cmp.score}%` }} />
+                  <span className={`block h-full rounded-full transition-all ${tone === 'good' ? 'bg-emerald-500' : tone === 'mid' ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${res.score}%` }} />
                 </span>
                 <span className="shrink-0 text-sm font-semibold">{tone === 'good' ? '아주 좋아요!' : tone === 'mid' ? '거의 다 왔어요' : '한 번 더!'}</span>
               </div>
               <div className="rounded-xl bg-muted/50 px-3 py-2.5">
                 <p className="text-[11px] font-semibold text-muted-foreground">내가 말한 것 (알아들은 글자)</p>
-                <p lang="ja" className="mt-0.5 font-jp text-lg">{said.text}</p>
+                <p lang="ja" className="mt-0.5 font-jp text-lg">{best}</p>
               </div>
               <div className="rounded-xl bg-muted/50 px-3 py-2.5">
                 <p className="text-[11px] font-semibold text-muted-foreground">소리로 비교 <span className="font-normal">· 위: 원문 소리 / 아래: 내 소리</span></p>
                 <p lang="ja" className="mt-1 break-all font-jp text-base leading-7">
-                  {cmp.ans.map((c, i) => <span key={i} className={c.bad ? 'rounded-sm bg-amber-200/70 text-amber-900 underline decoration-wavy underline-offset-4 dark:bg-amber-500/25 dark:text-amber-200' : ''}>{c.c}</span>)}
+                  {res.ans.map((c, i) => <span key={i} className={c.bad ? 'rounded-sm bg-amber-200/70 text-amber-900 underline decoration-wavy underline-offset-4 dark:bg-amber-500/25 dark:text-amber-200' : ''}>{c.c}</span>)}
                 </p>
                 <p lang="ja" className="break-all font-jp text-base leading-7">
-                  {cmp.inp.map((c, i) => <span key={i} className={c.bad ? 'rounded-sm bg-destructive/15 text-destructive' : 'text-emerald-700 dark:text-emerald-400'}>{c.c}</span>)}
+                  {res.inp.map((c, i) => <span key={i} className={c.bad ? 'rounded-sm bg-destructive/15 text-destructive' : 'text-emerald-700 dark:text-emerald-400'}>{c.c}</span>)}
                 </p>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">노란 글자는 덜 들린 소리, 빨간 글자는 다르게 들린 소리예요. 한자·히라가나 차이는 상관없어요.</p>
+                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">노란 글자는 덜 들린 소리, 빨간 글자는 다르게 들린 소리예요. 한자·히라가나 차이나, 소리가 같은 다른 한자(鐘·金 등)는 상관없어요.</p>
+                <p className="mt-1 text-[10px] text-muted-foreground/70">한자 읽기: KANJIDIC2 © EDRDG (CC BY-SA 4.0)</p>
               </div>
               {said.conf > 0 && said.conf < 0.6 && <p className="text-xs text-muted-foreground">💡 인식기가 조금 헷갈려 했어요. 조금 더 또렷하게, 마이크 가까이에서 말해 보세요.</p>}
             </div>
