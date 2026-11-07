@@ -14,6 +14,7 @@ import { ADMIN_EMAIL, firebaseConfigured, getFirebaseAuth, googleProvider } from
 import { actions, isInvited, loadNickname, startSync, stopSync, useStore, type SongRequest } from '@/lib/store'
 import { NicknameForm } from '@/components/kakitori/nickname'
 import { Tutorial, shouldShowTutorial } from '@/components/kakitori/tutorial'
+import { CompletionWatcher, StampBook } from '@/components/kakitori/stamps'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
 import { WrongNote } from '@/components/kakitori/wrong-note'
@@ -75,6 +76,7 @@ export default function Page() {
   const [auth, setAuth] = useState<AuthState>('loading')
   const [nickOpen, setNickOpen] = useState(false)
   const [tutOpen, setTutOpen] = useState(false)
+  const [bookOpen, setBookOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
@@ -247,6 +249,7 @@ export default function Page() {
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
       onHelp={() => setTutOpen(true)}
+      onStampBook={() => setBookOpen(true)}
       onRegisterRequest={(r) => { setPendingRequest(r); go('editor', null) }}
     />
   )
@@ -280,6 +283,10 @@ export default function Page() {
       <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} onNickname={() => setNickOpen(true)} />
       {body}
       {tutOpen && <Tutorial onClose={() => setTutOpen(false)} />}
+      {view === 'study' && selected && diff && (
+        <CompletionWatcher key={`${selected.id}-${diff}`} song={selected} d={diff} onNext={(d) => go('study', selected.id, null, d)} onBook={() => setBookOpen(true)} />
+      )}
+      {bookOpen && <StampBook isAdmin={isAdmin} onClose={() => setBookOpen(false)} onOpen={(id) => { setBookOpen(false); go('study', id) }} />}
     </div>
   )
 }

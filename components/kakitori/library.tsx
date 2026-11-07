@@ -12,11 +12,12 @@ import { ContinueBanner } from './continue-banner'
 import { ThemedCard } from './themed'
 import { wrongItems } from '@/lib/wrong'
 import { InstallBanner } from './install-banner'
+import { Stamp } from './stamps'
 import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -26,6 +27,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onVocab: () => void
   onWrong: () => void
   onHelp: () => void
+  onStampBook: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
   const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
@@ -68,6 +70,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onHelp} className="h-10 px-3"><CircleHelp data-icon="inline-start" />사용법</Button>
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
+          <Button variant="outline" onClick={onStampBook} className="h-10 px-3"><Stamp d="normal" on className="mr-0.5 size-5 text-[10px] shadow-none" />도장 수첩</Button>
           <Button variant="outline" onClick={onWrong} className="h-10 px-3"><NotebookPen data-icon="inline-start" />오답 노트{wrongCount > 0 && <span className="ml-0.5 rounded-full bg-destructive/10 px-1.5 text-xs font-bold text-destructive tabular-nums">{wrongCount}</span>}</Button>
           <Button variant="outline" onClick={() => setReqOpen(true)} className="relative h-10 px-3">
             <Music2 data-icon="inline-start" />{isAdmin ? '곡 신청 목록' : '곡 신청'}
@@ -162,7 +165,6 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           const n = song.lines.length
           const stats = DIFFICULTIES.map((d) => stat(song, d))
           const started = stats.some((x) => x.ok > 0 || Object.keys(progress[progKey(song.id, x.d)] ?? {}).length > 0)
-          const best = [...stats].reverse().find((x) => x.total > 0 && x.ok === x.total)
           const timed = isTimed(song)
           return (
             <ThemedCard key={song.id} song={song} className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
@@ -192,8 +194,10 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
                     </span>
                   </span>
                 )}
-                {best && (
-                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white shadow">{DIFFICULTY_LABEL[best.d]} 완주</span>
+                {(timed || isAdmin) && (
+                  <span className="absolute right-2 top-2 flex gap-1">
+                    {stats.map((x) => <Stamp key={x.d} d={x.d} on={x.total > 0 && x.ok === x.total} onPhoto className="size-8 text-sm sm:size-9 sm:text-base" />)}
+                  </span>
                 )}
               </button>
               <div className="flex items-start justify-between gap-3">
