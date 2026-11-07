@@ -160,7 +160,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         <p className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">‘{q.trim()}’ 에 맞는 곡이 없어요.</p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {shown.map((song) => {
           const n = song.lines.length
           const stats = DIFFICULTIES.map((d) => stat(song, d))
