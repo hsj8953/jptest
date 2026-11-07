@@ -16,7 +16,7 @@ import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -25,6 +25,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onNew: () => void
   onVocab: () => void
   onWrong: () => void
+  onHelp: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
   const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
@@ -62,7 +63,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">今日の練習</p>
           <h1 className="font-jp text-3xl font-bold tracking-tight sm:text-4xl">어떤 노래를 적어볼까요?</h1>
-          <p className="mt-2 text-sm text-muted-foreground">가사를 듣고, 천천히 한 글자씩 기록해 보세요.</p>
+          <p className="mt-2 text-sm text-muted-foreground">가사를 듣고, 천천히 한 글자씩 기록해 보세요. <button onClick={onHelp} className="ml-1 underline decoration-dotted underline-offset-4 hover:text-foreground">사용법 보기</button></p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>

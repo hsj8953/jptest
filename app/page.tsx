@@ -13,6 +13,7 @@ import { Login, NotInvited, SetupNeeded } from '@/components/kakitori/login'
 import { ADMIN_EMAIL, firebaseConfigured, getFirebaseAuth, googleProvider } from '@/lib/firebase'
 import { actions, isInvited, loadNickname, startSync, stopSync, useStore, type SongRequest } from '@/lib/store'
 import { NicknameForm } from '@/components/kakitori/nickname'
+import { Tutorial, shouldShowTutorial } from '@/components/kakitori/tutorial'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
 import { WrongNote } from '@/components/kakitori/wrong-note'
@@ -73,6 +74,7 @@ function useDarkMode() {
 export default function Page() {
   const [auth, setAuth] = useState<AuthState>('loading')
   const [nickOpen, setNickOpen] = useState(false)
+  const [tutOpen, setTutOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
@@ -178,6 +180,11 @@ export default function Page() {
   }
 
   if (!firebaseConfigured) return <SetupNeeded />
+  // 처음 들어온 사람: 닉네임까지 정하고 곡 목록에 오면 사용법 안내를 한 번 보여 줘요
+  useEffect(() => {
+    if (auth === 'in' && user?.name && !nickOpen && view === 'library' && shouldShowTutorial()) setTutOpen(true)
+  }, [auth, user?.name, nickOpen, view])
+
   if (auth === 'loading') {
     return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   }
@@ -239,6 +246,7 @@ export default function Page() {
       onNew={() => { setPendingRequest(null); go('editor', null) }}
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
+      onHelp={() => setTutOpen(true)}
       onRegisterRequest={(r) => { setPendingRequest(r); go('editor', null) }}
     />
   )
@@ -271,6 +279,7 @@ export default function Page() {
     <div className="app-paper min-h-screen">
       <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} onNickname={() => setNickOpen(true)} />
       {body}
+      {tutOpen && <Tutorial onClose={() => setTutOpen(false)} />}
     </div>
   )
 }
