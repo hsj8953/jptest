@@ -420,3 +420,43 @@
 
 /* 화면을 끝까지 쓸 때(viewport-fit=cover) 내용이 제스처 바·홈 표시줄에 가리지 않게 아래 여백을 둬요 */
 body { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ── 사용법 안내 그림 애니메이션 ─────────────── */
+.tut-caret { display: inline-block; width: 2px; height: 1.1em; margin-left: 1px; background: var(--primary); vertical-align: middle; }
+.tut-strike { position: relative; }
+.tut-strike::after { content: ''; position: absolute; left: -0.1em; right: -0.1em; top: 52%; height: 2px; background: currentColor; transform-origin: left; }
+.tut-stamp .hanko { top: 0; right: -0.6rem; margin-top: -1.1rem; width: 4rem; }
+.tut-stamp .hanko svg { width: 3.4rem; height: 3.4rem; }
+.tut-stamp .hanko-label { font-size: 0.62rem; }
+.tut-stamp-low .hanko { top: 2.1rem; }
+@media (min-width: 640px) {
+  .tut-stamp .hanko { width: 5.5rem; margin-top: -1.4rem; right: -1rem; }
+  .tut-stamp .hanko svg { width: 4.75rem; height: 4.75rem; }
+  .tut-stamp .hanko-label { font-size: 0.8rem; }
+  .tut-stamp-low .hanko { top: 3rem; }
+}
+@keyframes tut-bob {
+  0%, 100% { transform: translateY(0) rotate(-10deg) scale(1); }
+  30% { transform: translateY(-14px) rotate(8deg) scale(1.08); }
+  50% { transform: translateY(0) rotate(-4deg) scale(0.94, 1.06); }
+  65% { transform: translateY(-5px) rotate(4deg) scale(1); }
+}
+@keyframes tut-slide { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes tut-blink { 50% { opacity: 0; } }
+@keyframes tut-fill { 0%, 40% { opacity: 0; transform: translateY(-6px); } 55%, 100% { opacity: 1; transform: none; } }
+@keyframes tut-pick {
+  0%, 35% { background: var(--card); color: var(--foreground); border-color: var(--border); transform: scale(1); }
+  42% { transform: scale(0.9); }
+  50%, 100% { transform: scale(1); }
+}
+@keyframes tut-strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: no-preference) {
+  .tut-note { animation: tut-bob 1.9s ease-in-out infinite; }
+  .tut-slide { animation: tut-slide 380ms ease-out both; }
+  .tut-caret { animation: tut-blink 0.9s steps(1) infinite; }
+  .tut-fill { display: inline-block; animation: tut-fill 1.6s ease-out both; }
+  .tut-pick { animation: tut-pick 1.6s ease-out both; }
+  .tut-fill-late { animation: tut-fill 2.2s ease-out both; }
+  .tut-fill-mid { display: inline-block; animation: tut-fill 1.4s ease-out both; }
+  .tut-strike::after { animation: tut-strike 300ms 450ms ease-out both; }
+}
