@@ -136,7 +136,12 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
               </div>
               <div className="rounded-xl bg-muted/50 px-3 py-2.5">
                 <p className="text-[11px] font-semibold text-muted-foreground">내가 말한 것 (알아들은 글자)</p>
-                <p lang="ja" className="mt-0.5 font-jp text-lg">{best}</p>
+                <p lang="ja" className="mt-0.5 font-jp text-lg">{markHomophones(best, res.homophones.map((h) => h.said))}</p>
+                {res.homophones.map((h) => (
+                  <p key={h.said} className="mt-1 text-xs leading-5 text-muted-foreground">
+                    💡 <span lang="ja" className="font-jp font-semibold text-foreground">{h.said}</span>(<span lang="ja" className="font-jp">{h.read}</span>)라고 알아들었어요. 원문 한자 <span lang="ja" className="font-jp font-semibold text-foreground">{h.orig}</span>도 소리가 같아서 정답이에요.
+                  </p>
+                ))}
               </div>
               <div className="rounded-xl bg-muted/50 px-3 py-2.5">
                 <p className="text-[11px] font-semibold text-muted-foreground">소리로 비교 <span className="font-normal">· 위: 원문 소리 / 아래: 내 소리</span></p>
@@ -159,6 +164,15 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
 
       {mic && <Recorder />}
     </div>
+  )
+}
+
+/** 소리가 같은 다른 한자로 알아들은 곳에 점선 밑줄 */
+function markHomophones(text: string, words: string[]) {
+  if (!words.length) return text
+  const re = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`)
+  return text.split(re).map((part, i) =>
+    words.includes(part) ? <span key={i} className="text-muted-foreground underline decoration-dotted decoration-2 underline-offset-4" title="소리가 같은 다른 한자">{part}</span> : part,
   )
 }
 

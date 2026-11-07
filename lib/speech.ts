@@ -86,7 +86,19 @@ export function toReading(song: Song, text: string) {
 
 /** 가사 한 줄의 소리 (후리가나가 있으면 그걸로) */
 export function lineReading(song: Song, ruby: string) {
-  return parseRuby(ruby).map((p) => (p.reading ? clean(p.reading) : toReading(song, p.text))).join('')
+  return lineReadingSrc(song, ruby).text
+}
+/** 소리와 함께, 소리 글자마다 원문의 어느 글자(한자 덩어리)에서 왔는지 */
+function lineReadingSrc(song: Song, ruby: string) {
+  let text = ''
+  const src: string[] = []
+  for (const p of parseRuby(ruby)) {
+    const r = p.reading ? clean(p.reading) : toReading(song, p.text)
+    const whole = p.reading ? p.text : null
+    for (const ch of Array.from(r)) src.push(whole ?? ch)
+    text += r
+  }
+  return { text, src }
 }
 
 /* ── 한자 읽기 사전 (곡에 없는 한자용) ─────────────────────────
@@ -105,7 +117,7 @@ export function loadKanjiDict(): Promise<KanjiDict> {
   return dictPromise
 }
 
-type Tok = { c: string; read?: string[] } // read: 곡에서 읽기를 못 찾은 한자의 후보 읽기
+type Tok = { c: string; read?: string[]; from?: string; g?: number } // read: 곡에서 읽기를 못 찾은 한자의 후보 읽기 / from·g: 원래 한자와 묶음 번호
 
 /** 내가 말한 문장 → 소리 조각들 (곡에서 읽기를 아는 한자는 히라가나로, 모르는 한자는 사전 읽기 후보와 함께) */
 function speechTokens(song: Song, said: string, dict?: KanjiDict): Tok[] {
@@ -121,14 +133,16 @@ function speechTokens(song: Song, said: string, dict?: KanjiDict): Tok[] {
     for (let n = Math.min(max, cs.length - i); n >= 1; n--) {
       const r = map.get(cs.slice(i, i + n).join(''))
       if (r) {
-        for (const ch of Array.from(r)) out.push({ c: ch })
+        const from = cs.slice(i, i + n).join('')
+        const g = out.length
+        for (const ch of Array.from(r)) out.push({ c: ch, from, g })
         hit = n
         break
       }
     }
     if (hit) i += hit
     else {
-      out.push({ c: cs[i], read: dict?.get(cs[i]) ?? [] })
+      out.push({ c: cs[i], read: dict?.get(cs[i]) ?? [], from: cs[i], g: out.length })
       i++
     }
   }
@@ -143,7 +157,8 @@ export type Mark = { c: string; bad?: boolean }
  * score: 원문 소리 중 맞게 말한 비율(0~100)
  */
 export function compareSpeech(song: Song, ruby: string, said: string, dict?: KanjiDict) {
-  const T = Array.from(lineReading(song, ruby))
+  const L = lineReadingSrc(song, ruby)
+  const T = Array.from(L.text)
   const M = speechTokens(song, said, dict)
   const n = T.length
   const m = M.length
@@ -182,10 +197,19 @@ export function compareSpeech(song: Song, ruby: string, said: string, dict?: Kan
   let i = n
   let j = m
   let added = 0 // 원문에 없는 소리를 더 말한 개수
+  const matched = new Map<number, { from: string; read: string; src: Set<string> }>() // 한자 묶음별로 맞은 소리
+  const note = (t: Tok, ti: number[]) => {
+    if (t.g == null || !t.from) return
+    const e = matched.get(t.g) ?? { from: t.from, read: '', src: new Set<string>() }
+    e.read = ti.map((k) => T[k]).join('') + e.read
+    ti.forEach((k) => e.src.add(L.src[k]))
+    matched.set(t.g, e)
+  }
   while (i > 0 || j > 0) {
     const h = how[i][j]
     if (h === 1 || h === 2) {
       const ok = h === 1
+      if (ok) note(M[j - 1], [i - 1])
       ans.unshift({ c: T[i - 1], bad: !ok })
       inp.unshift({ c: M[j - 1].c, bad: !ok })
       i--
@@ -200,6 +224,7 @@ export function compareSpeech(song: Song, ruby: string, said: string, dict?: Kan
     } else if (h >= 10) {
       const k = h - 10
       const seg = T.slice(i - k, i)
+      note(M[j - 1], Array.from({ length: k }, (_, q) => i - k + q))
       ans.unshift(...seg.map((c) => ({ c })))
       inp.unshift(...seg.map((c) => ({ c }))) // 한자 대신 그 자리 소리로 보여 줘요
       i -= k
@@ -208,5 +233,11 @@ export function compareSpeech(song: Song, ruby: string, said: string, dict?: Kan
   }
   const hit = ans.filter((c) => !c.bad).length
   const score = n ? Math.max(0, Math.round(((hit - added * 0.5) / n) * 100)) : 0
-  return { target: T.join(''), mine: inp.map((c) => c.c).join(''), ans, inp, score }
+  // 소리는 같은데 원문과 다른 한자로 알아들은 것 (예: 鐘 → 金)
+  const homophones: { said: string; read: string; orig: string }[] = []
+  for (const e of matched.values()) {
+    const orig = [...e.src].join('')
+    if (KANJI.test(orig) && orig !== e.from && !homophones.some((h) => h.said === e.from)) homophones.push({ said: e.from, read: e.read, orig })
+  }
+  return { target: T.join(''), mine: inp.map((c) => c.c).join(''), ans, inp, score, homophones }
 }
