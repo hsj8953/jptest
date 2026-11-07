@@ -15,6 +15,7 @@ import { BackButton, Furigana, ProgressBar } from './furigana'
 import { themeStyle, useSongHue } from '@/lib/theme'
 import { Results } from './results'
 import { ExplainPanel } from './explain-view'
+import { ShadowPanel } from './shadow-panel'
 
 type Result = { ok: boolean; input: string; revealed: boolean; restored?: boolean }
 
@@ -420,6 +421,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
             ) : (
               <>
                 <ExplainPanel key={current} line={sentence} />
+                <ShadowPanel key={`sh-${current}`} song={song} lineIndex={current} />
                 {navButtons(result.ok, retry)}
               </>
             )}

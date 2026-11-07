@@ -8,6 +8,7 @@ import { normalizeKanji } from '@/lib/ruby'
 import type { LineProgress, Song } from '@/lib/types'
 import { Furigana } from './furigana'
 import { ExplainPanel } from './explain-view'
+import { ShadowPanel } from './shadow-panel'
 
 /** 채점 도장 (〇 정답 / ✕ 오답) */
 export function Hanko({ ok, still = false }: { ok: boolean; still?: boolean }) {
@@ -263,6 +264,7 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
       ) : (
         <>
           <ExplainPanel line={line} />
+          <ShadowPanel song={song} lineIndex={lineIndex} />
           {nav(graded, retry)}
         </>
       )}
@@ -280,6 +282,7 @@ export function ListenOnlyCard({ song, lineIndex, nav }: { song: Song; lineIndex
       <p className="mt-1 text-xs text-muted-foreground">빈칸으로 만들 단어가 없는 짧은 문장이라 듣고 따라 읽어 보세요. 기록에는 들어가지 않아요.</p>
       <p className="mt-4 font-jp text-xl leading-loose"><Furigana text={normalizeKanji(line.ruby)} /></p>
       <p className="mt-2 text-base text-muted-foreground">{line.ko}</p>
+      <ShadowPanel song={song} lineIndex={lineIndex} />
       {nav}
     </div>
   )
