@@ -5,6 +5,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Mic, Square } from 'lucide-react'
 import { diffChars } from '@/lib/diff'
+import { answerOf } from '@/lib/ruby'
+import { Furigana } from '@/components/kakitori/furigana'
 
 type Alt = { text: string; conf: number }
 type Try = { target: string; alts: Alt[]; at: number }
@@ -27,7 +29,7 @@ const getRec = (): (new () => Rec) | null => {
   return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as (new () => Rec) | null
 }
 
-const SAMPLES = ['夜空に光が咲いた', '君の声が聞こえる', '明日もきっと会える', 'ありがとう、また会おうね']
+const SAMPLES = ['夜空{よぞら}に光{ひかり}が咲{さ}いた', '君{きみ}の声{こえ}が聞{き}こえる', '明日{あした}もきっと会{あ}える', 'ありがとう、また会{あ}おうね']
 const strip = (s: string) => s.replace(/[\s　、。，．！？!?,.・「」『』〜~ー]/g, '')
 
 const ERR: Record<string, string> = {
@@ -66,7 +68,7 @@ export default function SpeechTest() {
     r.interimResults = true
     r.continuous = false
     r.maxAlternatives = 3
-    const goal = target
+    const goal = target.trim()
     r.onresult = (e) => {
       let text = ''
       for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript
@@ -96,7 +98,7 @@ export default function SpeechTest() {
   }
   const stop = () => recRef.current?.stop()
 
-  const matched = tries.filter((t) => t.target && strip(t.alts[0].text) === strip(t.target)).length
+  const matched = tries.filter((t) => t.target && strip(t.alts[0].text) === strip(answerOf(t.target))).length
   const withTarget = tries.filter((t) => t.target).length
 
   return (
@@ -114,11 +116,13 @@ export default function SpeechTest() {
       )}
 
       <section className="mt-6 rounded-2xl border border-border bg-card p-4">
-        <label className="text-xs font-semibold text-muted-foreground" htmlFor="target">읽을 문장 (비워 두면 인식 결과만 봐요)</label>
-        <input id="target" lang="ja" value={target} onChange={(e) => setTarget(e.target.value)} className="mt-1.5 h-12 w-full rounded-xl border border-input bg-background px-3 font-jp text-lg outline-none focus:ring-2 focus:ring-ring" />
+        <p className="text-xs font-semibold text-muted-foreground">읽을 문장</p>
+        <p className="mt-2 min-h-12 text-center font-jp text-2xl leading-[2.6]">{target.trim() ? <Furigana text={target} /> : <span className="text-sm text-muted-foreground">비워 두면 인식 결과만 봐요</span>}</p>
+        <label className="mt-1 block text-[11px] text-muted-foreground" htmlFor="target">직접 입력: 한자 뒤에 {'{읽기}'}를 붙이면 후리가나가 달려요. 예) 夜空{'{よぞら}'}</label>
+        <input id="target" lang="ja" value={target} onChange={(e) => setTarget(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-background px-3 font-jp text-base outline-none focus:ring-2 focus:ring-ring" />
         <div className="mt-2 flex flex-wrap gap-1.5">
           {SAMPLES.map((s) => (
-            <button key={s} onClick={() => setTarget(s)} className={`rounded-full border px-2.5 py-1 font-jp text-xs ${s === target ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'}`}>{s}</button>
+            <button key={s} onClick={() => setTarget(s)} className={`rounded-full border px-2.5 py-1 font-jp text-xs ${s === target ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'}`}>{answerOf(s)}</button>
           ))}
         </div>
 
@@ -142,11 +146,11 @@ export default function SpeechTest() {
           <ul className="flex flex-col gap-2">
             {tries.map((t) => {
               const best = t.alts[0]
-              const d = t.target ? diffChars(strip(t.target), strip(best.text)) : null
-              const same = t.target && strip(best.text) === strip(t.target)
+              const d = t.target ? diffChars(strip(answerOf(t.target)), strip(best.text)) : null
+              const same = t.target && strip(best.text) === strip(answerOf(t.target))
               return (
                 <li key={t.at} className="rounded-2xl border border-border bg-card p-3.5">
-                  {t.target && <p lang="ja" className="font-jp text-sm text-muted-foreground">읽은 문장: {t.target}</p>}
+                  {t.target && <p className="font-jp text-sm leading-8 text-muted-foreground">읽은 문장: <Furigana text={t.target} /></p>}
                   <p lang="ja" className="mt-1 font-jp text-xl leading-8">
                     {d ? d.inp.map((c, i) => <span key={i} className={c.bad ? 'rounded-sm bg-destructive/15 text-destructive' : 'text-emerald-700 dark:text-emerald-400'}>{c.c}</span>) : best.text}
                     {same && <span className="ml-2 align-middle text-sm">✅</span>}
