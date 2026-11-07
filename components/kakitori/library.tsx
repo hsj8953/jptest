@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { BookOpen, ChevronRight, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { BookOpen, ChevronRight, CircleHelp, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore, type SongRequest } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -63,9 +63,10 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">今日の練習</p>
           <h1 className="font-jp text-3xl font-bold tracking-tight sm:text-4xl">어떤 노래를 적어볼까요?</h1>
-          <p className="mt-2 text-sm text-muted-foreground">가사를 듣고, 천천히 한 글자씩 기록해 보세요. <button onClick={onHelp} className="ml-1 underline decoration-dotted underline-offset-4 hover:text-foreground">사용법 보기</button></p>
+          <p className="mt-2 text-sm text-muted-foreground">가사를 듣고, 천천히 한 글자씩 기록해 보세요.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={onHelp} className="h-10 px-3"><CircleHelp data-icon="inline-start" />사용법</Button>
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
           <Button variant="outline" onClick={onWrong} className="h-10 px-3"><NotebookPen data-icon="inline-start" />오답 노트{wrongCount > 0 && <span className="ml-0.5 rounded-full bg-destructive/10 px-1.5 text-xs font-bold text-destructive tabular-nums">{wrongCount}</span>}</Button>
           <Button variant="outline" onClick={() => setReqOpen(true)} className="relative h-10 px-3">
