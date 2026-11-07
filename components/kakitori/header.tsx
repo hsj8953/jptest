@@ -10,7 +10,7 @@ export function Header({ user, dark, onHome, onDark, onLogout, onNickname }: { u
   const initial = user.name.slice(0, 1)
   return (
     <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-10">
         <button onClick={onHome} className="flex items-center gap-2 rounded-lg text-left transition-opacity hover:opacity-80">
           <AppLogo className="size-9 shrink-0 rounded-xl shadow-sm" />
           <span>

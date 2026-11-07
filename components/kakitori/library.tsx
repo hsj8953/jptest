@@ -60,7 +60,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   const shown = nq ? sorted.filter((s) => norm(`${s.title} ${s.artist}`).includes(nq)) : sorted
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+    <main className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 sm:py-12 lg:px-10">
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">今日の練習</p>
