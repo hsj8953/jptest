@@ -138,14 +138,37 @@ function LevelsArt() {
           </div>
         )}
       </div>
-      <div className="mt-2 flex justify-center gap-1 sm:mt-3" aria-hidden>
-        {[0, 1, 2, 3].map((k) => <span key={k} className={`h-1 rounded-full transition-all ${k === p ? 'w-3 bg-primary/70' : 'w-1 bg-foreground/15'}`} />)}
+    </div>
+  )
+}
+
+/* 3장: 문장 듣기 · 반복 · 배속 → 정답 도장 → 오답 도장 */
+function ListenScene() {
+  const play = useLater(450)
+  const loop = useLater(1300)
+  const slow = useLater(2100)
+  return (
+    <div>
+      <div className={`flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-bold text-primary-foreground transition sm:h-12 sm:text-base ${play ? 'tut-press bg-primary/90' : 'bg-primary'}`}>
+        {play ? <>⏸ 멈추기<span className="tut-eq ml-1" aria-hidden><i /><i /><i /><i /></span></> : '🎧 1번 문장 듣기'}
+      </div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-foreground/10 sm:mt-2.5 sm:h-1.5">
+        {play && <div className="tut-progress h-full rounded-full bg-primary" style={{ animationDuration: slow ? '1.6s' : '1.1s' }} />}
+      </div>
+      <div className="mt-2 flex gap-2 sm:mt-3 sm:gap-3">
+        <span className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border text-xs transition sm:h-11 sm:text-sm ${loop ? 'tut-pop border-primary bg-primary/10 font-semibold text-primary' : 'border-border bg-card text-muted-foreground'}`}>
+          <span className={`grid size-3.5 place-items-center rounded-[4px] border text-[9px] leading-none sm:size-4 sm:text-[11px] ${loop ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50'}`}>{loop ? '✓' : ''}</span>
+          🔁 반복
+        </span>
+        <span className={`flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border text-xs transition sm:h-11 sm:text-sm ${slow ? 'tut-pop border-primary bg-primary/10 font-semibold text-primary' : 'border-border bg-card text-muted-foreground'}`}>
+          🐢 {slow ? '0.75배속' : '1배속'} <span className="text-[10px] opacity-60">▾</span>
+        </span>
       </div>
     </div>
   )
 }
 
-/* 3장: 정답이면 〇 도장, 오답이면 틀린 곳에 줄 긋고 ✕ 도장 */
+/* 정답이면 〇 도장, 오답이면 틀린 곳에 줄 긋고 ✕ 도장 */
 function GradeOk() {
   const stamp = useLater(550)
   return (
@@ -172,10 +195,10 @@ function GradeNo() {
   )
 }
 function GradeArt() {
-  const p = usePhase(2, 3200)
+  const p = usePhase(3, 3400)
   return (
     <div className="w-[85%] sm:w-[75%]">
-      <div key={p} className="tut-slide">{p === 0 ? <GradeOk /> : <GradeNo />}</div>
+      <div key={p} className="tut-slide">{p === 0 ? <ListenScene /> : p === 1 ? <GradeOk /> : <GradeNo />}</div>
     </div>
   )
 }
