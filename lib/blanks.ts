@@ -180,8 +180,12 @@ export function blanksFor(song: Song, lineIndex: number): BlankLine {
 }
 
 /** 이 난이도에서 채점하는 문장 번호들 (쉬움·보통은 빈칸이 있는 문장만) */
+// 곡 데이터가 바뀌면 새 객체가 오니까, 같은 곡 객체에서는 한 번만 계산해요
+const gradedCache = new WeakMap<Song, Partial<Record<Difficulty, number[]>>>()
 export function gradedLines(song: Song, d: Difficulty) {
-  return song.lines.map((_, i) => i).filter((i) => d === 'hard' || blanksFor(song, i).answers.length > 0)
+  let c = gradedCache.get(song)
+  if (!c) gradedCache.set(song, (c = {}))
+  return (c[d] ??= song.lines.map((_, i) => i).filter((i) => d === 'hard' || blanksFor(song, i).answers.length > 0))
 }
 
 const toHiraStr = (s: string) => s.replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trophy, X } from 'lucide-react'
 import { countCorrectIn, progKey, useStore } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -111,10 +111,14 @@ export function CompletionWatcher({ song, d, onNext, onBook }: { song: Song; d: 
 /** 도장 수첩: 곡마다 받은 도장을 모아 봐요. 곡을 누르면 그 곡으로 */
 export function StampBook({ isAdmin, onClose, onOpen }: { isAdmin: boolean; onClose: () => void; onOpen: (id: string) => void }) {
   const { songs, progress } = useStore()
-  const list = [...songs]
-    .filter((s) => isTimed(s) || isAdmin)
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map((song) => ({ song, got: DIFFICULTIES.map((d) => isComplete(song, d, progress[progKey(song.id, d)])) }))
+  const list = useMemo(
+    () =>
+      [...songs]
+        .filter((s) => isTimed(s) || isAdmin)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map((song) => ({ song, got: DIFFICULTIES.map((d) => isComplete(song, d, progress[progKey(song.id, d)])) })),
+    [songs, progress, isAdmin],
+  )
   const have = list.reduce((n, x) => n + x.got.filter(Boolean).length, 0)
   const all = list.length * DIFFICULTIES.length
   const trophies = list.filter((x) => x.got.every(Boolean)).length
@@ -145,7 +149,7 @@ export function StampBook({ isAdmin, onClose, onOpen }: { isAdmin: boolean; onCl
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">{song.artist}</span>
                 </span>
-                {DIFFICULTIES.map((d, k) => <Stamp key={d} d={d} on={got[k]} className="size-8 text-sm sm:size-9 sm:text-base" />)}
+                {DIFFICULTIES.map((d, k) => <Stamp key={d} d={d} on={got[k]} className="size-8 text-sm shadow-none sm:size-9 sm:text-base" />)}
               </button>
             </li>
           ))}
@@ -167,8 +171,8 @@ function Overlay({ onClose, label, wide = false, children }: { onClose: () => vo
     }
   }, [onClose])
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 py-6 backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={label} className={`hint-pop max-h-full w-full overflow-y-auto rounded-3xl border border-border bg-card p-5 shadow-2xl sm:p-7 ${wide ? 'max-w-lg' : 'max-w-sm sm:max-w-md'}`}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-4 py-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={label} className={`hint-pop max-h-full w-full overflow-y-auto overscroll-contain rounded-3xl border border-border bg-card p-5 shadow-2xl sm:p-7 ${wide ? 'max-w-lg' : 'max-w-sm sm:max-w-md'}`}>
         {children}
       </div>
     </div>
