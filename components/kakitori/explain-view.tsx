@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { BookOpenText, ChevronDown, Volume2 } from 'lucide-react'
 import { speak } from '@/lib/words'
 import { readingsFromRuby } from '@/lib/ruby'
-import type { Line } from '@/lib/types'
+import type { ExplainExample, Line } from '@/lib/types'
+import { Furigana } from './furigana'
 
 const POS_COLOR: Record<string, string> = {
   명사: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
@@ -96,6 +97,7 @@ export function ExplainBody({ ex, ruby }: { ex: NonNullable<Line['explain']>; ru
               <span className="order-last col-span-3 min-w-0 text-sm sm:order-none sm:col-span-1">
                 {w.m}
                 {w.note && <span className="mt-0.5 block text-xs text-primary">{w.note}</span>}
+                {w.ex && <Example ex={w.ex} />}
               </span>
               <Volume2 className="size-3.5 text-muted-foreground opacity-60 transition sm:opacity-0 sm:group-hover:opacity-100" />
             </button>
@@ -110,6 +112,7 @@ export function ExplainBody({ ex, ruby }: { ex: NonNullable<Line['explain']>; ru
               <div key={i} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-6 dark:border-amber-500/30 dark:bg-amber-500/10">
                 <p lang="ja" className="font-jp font-bold">{g.title}</p>
                 <p className="whitespace-pre-line">{g.body}</p>
+                {g.ex && <Example ex={g.ex} />}
               </div>
             ))}
           </div>
@@ -126,5 +129,16 @@ export function ExplainBody({ ex, ruby }: { ex: NonNullable<Line['explain']>; ru
       )}
       <p className="text-center text-[11px] text-muted-foreground">AI가 만든 풀이라 틀린 부분이 있을 수 있어요 · 단어를 누르면 발음 듣기</p>
     </div>
+  )
+}
+
+/** 실생활 예문 한 줄 (작게) */
+function Example({ ex }: { ex: ExplainExample }) {
+  return (
+    <span className="mt-1.5 block rounded-lg bg-background/70 px-2 py-1 text-xs leading-5 text-muted-foreground">
+      <span className="mr-1 font-semibold text-foreground/70">예)</span>
+      <span className="font-jp text-[13px] leading-[1.9] text-foreground/90"><Furigana text={ex.ja} /></span>
+      <span className="block">{ex.ko}</span>
+    </span>
   )
 }

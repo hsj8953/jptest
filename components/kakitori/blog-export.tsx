@@ -83,8 +83,16 @@ export function BlogExport({ song, onClose }: { song: Song; onClose: () => void 
       if (opts.has('reading')) out.push(`읽기: ${r.reading}`)
       if (opts.has('ko')) out.push(`해석: ${r.ko}`)
       if (opts.has('literal') && r.literal) out.push(`직역: ${r.literal}`)
-      if (opts.has('words')) for (const w of r.words) out.push(`단어: ${w.w} · ${w.r} · ${w.pos} · ${w.m}${w.note ? ` (${w.note})` : ''}`)
-      if (opts.has('grammar')) for (const g of r.grammar) out.push(`문법: ${g.title} — ${g.body.replace(/\n/g, ' ')}`)
+      if (opts.has('words'))
+        for (const w of r.words) {
+          out.push(`단어: ${w.w} · ${w.r} · ${w.pos} · ${w.m}${w.note ? ` (${w.note})` : ''}`)
+          if (w.ex) out.push(`  예문: ${w.ex.ja} / ${w.ex.ko}`)
+        }
+      if (opts.has('grammar'))
+        for (const g of r.grammar) {
+          out.push(`문법: ${g.title} — ${g.body.replace(/\n/g, ' ')}`)
+          if (g.ex) out.push(`  예문: ${g.ex.ja} / ${g.ex.ko}`)
+        }
       out.push('')
     }
     if (quizData) out.push(`[받아쓰기 문제] 문장 ${quizData.n}: ${quizData.text}`, `정답: ${quizData.answer}`)
@@ -106,7 +114,7 @@ export function BlogExport({ song, onClose }: { song: Song; onClose: () => void 
             r.words.map((w) => `<tr><td ${td}>${esc(w.w)}</td><td ${td}>${esc(w.r)}</td><td ${td}>${esc(w.pos)}</td><td ${td}>${esc(w.m)}${w.note ? `<br><small>${esc(w.note)}</small>` : ''}</td></tr>`).join('') +
             '</table>',
         )
-      if (opts.has('grammar')) for (const g of r.grammar) parts.push(`<p><b>📌 문법 포인트 · ${esc(g.title)}</b><br>${esc(g.body).replace(/\n/g, '<br>')}</p>`)
+      if (opts.has('grammar')) for (const g of r.grammar) parts.push(`<p><b>📌 문법 포인트 · ${esc(g.title)}</b><br>${esc(g.body).replace(/\n/g, '<br>')}${g.ex ? `<br><small>예) ${esc(answerOf(g.ex.ja))} — ${esc(g.ex.ko)}</small>` : ''}</p>`)
       parts.push('<p><br></p>')
     })
     if (quizData) {

@@ -1,8 +1,10 @@
 /** 문장 풀이 (AI가 만들고 관리자가 고칠 수 있어요) */
-export type ExplainWord = { w: string; r: string; pos: string; m: string; note?: string }
+/** 실생활 예문. ja는 후리가나 표기(漢字{かな}) 포함 */
+export type ExplainExample = { ja: string; ko: string }
+export type ExplainWord = { w: string; r: string; pos: string; m: string; note?: string; ex?: ExplainExample }
 export type LineExplain = {
   words: ExplainWord[]
-  grammar: { title: string; body: string }[]
+  grammar: { title: string; body: string; ex?: ExplainExample }[]
   literal: string
   natural: string
 }

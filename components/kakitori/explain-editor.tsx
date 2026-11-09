@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpenText, ChevronDown, Loader2, Plus, Trash2 } from 'lucide-react'
-import { generateExplain } from '@/lib/explain'
+import { BookOpenText, ChevronDown, Loader2, MessageSquareQuote, Plus, Trash2 } from 'lucide-react'
+import { generateExamples, generateExplain, needsExamples } from '@/lib/explain'
 import { answerOf } from '@/lib/ruby'
-import type { Line, LineExplain } from '@/lib/types'
+import type { ExplainExample, Line, LineExplain } from '@/lib/types'
 import { ExplainBody } from './explain-view'
 
 const errText = (code?: string) =>
@@ -27,6 +27,43 @@ export function ExplainEditor({ lines, onChange }: { lines: Line[]; onChange: (f
 
   const usable = lines.filter((l) => answerOf(l.ruby))
   const doneCount = usable.filter((l) => l.explain).length
+  const exNeed = lines.filter((l) => needsExamples(l.explain)).length
+
+  // 새로 받은 예문을 지금 화면의 풀이에 합쳐요 (그사이 고친 내용은 그대로, 빈 예문만 채움)
+  const mergeExamples = (explains: (LineExplain | undefined)[]) =>
+    onChange((rows) =>
+      rows?.map((l, i) => {
+        const got = explains[i]
+        if (!l.explain || !got || got.words.length !== l.explain.words.length) return l
+        return {
+          ...l,
+          explain: {
+            ...l.explain,
+            words: l.explain.words.map((w, k) => (w.ex ? w : got.words[k]?.ex ? { ...w, ex: got.words[k].ex } : w)),
+            grammar: l.explain.grammar.map((g, k) => (g.ex ? g : got.grammar[k]?.ex ? { ...g, ex: got.grammar[k].ex } : g)),
+          },
+        }
+      }) ?? rows,
+    )
+  const buildExamples = async (base: Line[] = lines) => {
+    setBusy(true)
+    setMsg('예문을 만드는 중…')
+    try {
+      const r = await generateExamples(base, (d, t, note) => setMsg(note ?? `AI가 실생활 예문을 만드는 중… ${d} / ${t}`))
+      mergeExamples(r.explains)
+      setMsg(
+        r.total === 0
+          ? '모든 단어·문법에 예문이 있어요.'
+          : r.failed
+            ? `${r.total - r.failed}문장 예문을 만들었어요. ${r.failed}문장은 실패했어요(${errText(r.error)}${r.detail ? ` · ${r.detail}` : ''}). 다시 누르면 빈 것만 채워요.`
+            : `${r.total}문장의 예문을 만들었어요. 곡을 저장해야 반영돼요.`,
+      )
+    } catch {
+      setMsg('예문을 만들지 못했어요. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const build = async () => {
     setBusy(true)
@@ -34,6 +71,11 @@ export function ExplainEditor({ lines, onChange }: { lines: Line[]; onChange: (f
     try {
       const r = await generateExplain(lines, (d, t, note) => setMsg(note ?? `AI가 문장 풀이를 만드는 중… ${d} / ${t}`))
       onChange((rows) => rows?.map((l, i) => (r.explains[i] && !l.explain ? { ...l, explain: r.explains[i] } : l)) ?? rows)
+      // 풀이를 새로 만들었으면 예문도 이어서 만들어요
+      if (r.total > r.failed) {
+        await buildExamples(lines.map((l, i) => (r.explains[i] && !l.explain ? { ...l, explain: r.explains[i] } : l)))
+        return
+      }
       setMsg(
         r.total === 0
           ? '모든 문장에 풀이가 있어요.'
@@ -67,9 +109,15 @@ export function ExplainEditor({ lines, onChange }: { lines: Line[]; onChange: (f
           {busy ? <Loader2 className="size-4 animate-spin" /> : <BookOpenText className="size-4" />}
           {doneCount ? '빈 문장 풀이 만들기' : '문장 풀이 만들기'}
         </button>
+        {doneCount > 0 && (
+          <button onClick={() => buildExamples()} disabled={busy || !exNeed} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50">
+            <MessageSquareQuote className="size-4" />
+            {exNeed ? `예문 채우기 (${exNeed}문장)` : '예문 모두 있음'}
+          </button>
+        )}
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       </div>
-      <p className="mb-3 text-xs leading-5 text-muted-foreground">AI가 문장마다 단어 뜻·품사, 문법 포인트, 직역·의역을 만들어요. 친구들은 채점한 뒤에 볼 수 있어요. 틀린 곳은 눌러서 고치고, 다시 만들고 싶은 문장은 풀이를 지운 뒤 버튼을 누르세요. 곡을 저장해야 반영돼요.</p>
+      <p className="mb-3 text-xs leading-5 text-muted-foreground">AI가 문장마다 단어 뜻·품사, 문법 포인트, 직역·의역과 실생활 예문을 만들어요. 친구들은 채점한 뒤에 볼 수 있어요. 틀린 곳은 눌러서 고치고, 다시 만들고 싶은 문장은 풀이를 지운 뒤 버튼을 누르세요. 곡을 저장해야 반영돼요.</p>
 
       {doneCount > 0 && (
         <div className="overflow-hidden rounded-xl border border-border">
@@ -103,6 +151,7 @@ export function ExplainEditor({ lines, onChange }: { lines: Line[]; onChange: (f
 }
 
 function ExplainForm({ ex, onChange }: { ex: LineExplain; onChange: (ex: LineExplain) => void }) {
+  const ex0 = ex
   const setWord = (i: number, k: keyof LineExplain['words'][number], v: string) => onChange({ ...ex, words: ex.words.map((w, j) => (j === i ? { ...w, [k]: v } : w)) })
   const setGrammar = (i: number, k: 'title' | 'body', v: string) => onChange({ ...ex, grammar: ex.grammar.map((g, j) => (j === i ? { ...g, [k]: v } : g)) })
   return (
@@ -118,6 +167,7 @@ function ExplainForm({ ex, onChange }: { ex: LineExplain; onChange: (ex: LineExp
               <button onClick={() => onChange({ ...ex, words: ex.words.filter((_, j) => j !== i) })} className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-destructive sm:order-last" aria-label="단어 지우기"><Trash2 className="size-4" /></button>
               <input value={w.m} onChange={(e) => setWord(i, 'm', e.target.value)} aria-label="뜻" placeholder="뜻" className={`${input} col-span-2 sm:col-span-1`} />
               <input value={w.note ?? ''} onChange={(e) => setWord(i, 'note', e.target.value)} aria-label="설명" placeholder="설명 (선택)" className={`${input} col-span-2 sm:col-span-1`} />
+              <ExampleInputs ex={w.ex} onChange={(ex) => onChange({ ...ex0, words: ex0.words.map((x, j) => (j === i ? { ...x, ex } : x)) })} className="col-span-4 sm:col-span-6" />
             </div>
           ))}
           <button onClick={() => onChange({ ...ex, words: [...ex.words, { w: '', r: '', pos: '', m: '', note: '' }] })} className="inline-flex w-fit items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-muted"><Plus className="size-3.5" />단어 추가</button>
@@ -133,6 +183,7 @@ function ExplainForm({ ex, onChange }: { ex: LineExplain; onChange: (ex: LineExp
                 <button onClick={() => onChange({ ...ex, grammar: ex.grammar.filter((_, j) => j !== i) })} className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-destructive" aria-label="문법 지우기"><Trash2 className="size-4" /></button>
               </div>
               <textarea value={g.body} onChange={(e) => setGrammar(i, 'body', e.target.value)} aria-label="문법 설명" rows={2} className="min-w-0 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring" />
+              <ExampleInputs ex={g.ex} onChange={(ex) => onChange({ ...ex0, grammar: ex0.grammar.map((x, j) => (j === i ? { ...x, ex } : x)) })} />
             </div>
           ))}
           {ex.grammar.length < 3 && (
@@ -144,6 +195,20 @@ function ExplainForm({ ex, onChange }: { ex: LineExplain; onChange: (ex: LineExp
         <label className="text-xs font-semibold text-muted-foreground">직역<input value={ex.literal} onChange={(e) => onChange({ ...ex, literal: e.target.value })} className={`${input} mt-1 w-full font-normal text-foreground`} /></label>
         <label className="text-xs font-semibold text-muted-foreground">의역<input value={ex.natural} onChange={(e) => onChange({ ...ex, natural: e.target.value })} className={`${input} mt-1 w-full font-normal text-foreground`} /></label>
       </section>
+    </div>
+  )
+}
+
+/** 예문 고치기: 일본어(후리가나 표기 가능) + 한국어. 둘 다 비우면 예문 없음 */
+function ExampleInputs({ ex, onChange, className = '' }: { ex?: ExplainExample; onChange: (ex?: ExplainExample) => void; className?: string }) {
+  const set = (k: 'ja' | 'ko', v: string) => {
+    const next = { ja: ex?.ja ?? '', ko: ex?.ko ?? '', [k]: v }
+    onChange(next.ja || next.ko ? next : undefined)
+  }
+  return (
+    <div className={`grid grid-cols-1 gap-1.5 sm:grid-cols-2 ${className}`}>
+      <input lang="ja" value={ex?.ja ?? ''} onChange={(e) => set('ja', e.target.value)} aria-label="예문 (일본어)" placeholder="예문 (일본어, 漢字{かな})" className={`${input} font-jp text-xs`} />
+      <input value={ex?.ko ?? ''} onChange={(e) => set('ko', e.target.value)} aria-label="예문 해석" placeholder="예문 해석" className={`${input} text-xs`} />
     </div>
   )
 }
