@@ -52,7 +52,19 @@ type State = {
 const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, news: [], error: null }
 export type NewsKind = 'new' | 'improve' | 'fix'
 export type NewsLink = 'stamps' | 'vocab' | 'wrong' | 'help' | 'progress'
-export type NewsItem = { id: string; kind: NewsKind; title: string; body: string; link?: NewsLink | null; blog?: string | null; createdAt: number }
+/** 패치 노트 한 줄 */
+export type NewsEntry = { kind: NewsKind; title: string; body?: string; link?: NewsLink | null }
+/** 소식 글 하나 = 한 번의 업데이트(패치 노트). 예전 형식(글 하나에 한 줄)도 읽을 수 있게 kind/body를 남겨 둬요 */
+export type NewsItem = {
+  id: string
+  title: string
+  createdAt: number
+  blog?: string | null
+  items?: NewsEntry[]
+  kind?: NewsKind
+  body?: string
+  link?: NewsLink | null
+}
 let state: State = empty
 let me: User | null = null
 let unsubs: (() => void)[] = []
@@ -404,9 +416,14 @@ export async function loadAllScores(songIds: string[]): Promise<ScoreRow[]> {
 }
 
 /* ── 업데이트 소식 (news/{id}): 멤버는 읽고, 관리자만 쓰고 지워요 ── */
-export async function postNews(n: Omit<NewsItem, 'id' | 'createdAt'> & { createdAt?: number }) {
+export async function postNews(n: { title: string; items: NewsEntry[]; blog?: string | null; createdAt?: number }) {
   const ref = doc(collection(getDb(), 'news'))
-  await setDoc(ref, { ...n, link: n.link ?? null, blog: n.blog?.trim() || null, createdAt: n.createdAt ?? Date.now() })
+  await setDoc(ref, {
+    title: n.title.trim(),
+    items: n.items.map((it) => ({ kind: it.kind, title: it.title.trim(), body: it.body?.trim() ?? '', link: it.link ?? null })),
+    blog: n.blog?.trim() || null,
+    createdAt: n.createdAt ?? Date.now(),
+  })
 }
 export async function deleteNews(id: string) {
   await deleteDoc(doc(getDb(), 'news', id))
