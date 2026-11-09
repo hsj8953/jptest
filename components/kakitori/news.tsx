@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Bell, ChevronDown, ExternalLink, Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { deleteNews, postNews, useStore, type NewsEntry, type NewsItem, type NewsKind, type NewsLink } from '@/lib/store'
+import { CHANGELOG } from '@/lib/changelog'
 
 /* ── 어디까지 읽었는지 (기기마다 기억) ─────────────────────────
    kakitori.news.seen = 마지막으로 확인한 소식의 시각. 처음 온 사람은 최근 7일 소식만 새 소식으로 쳐요. */
@@ -71,9 +72,25 @@ const summary = (items: NewsEntry[]) =>
     .map(([k, n]) => `${KIND[k].label} ${n}개`)
     .join(' · ')
 
+/** 코드에 적은 패치 노트(CHANGELOG) + 관리자가 사이트에서 쓴 소식. 같은 날 글은 하나로 합치고 같은 제목 줄은 한 번만 */
 function usePosts() {
   const { news } = useStore()
-  return useMemo(() => toPosts(news), [news])
+  return useMemo(() => {
+    const fromCode = toPosts(CHANGELOG).map((p) => ({ ...p, ids: [] as string[] }))
+    const merged = [...fromCode]
+    for (const p of toPosts(news)) {
+      const same = merged.find((m) => dayKey(m.createdAt) === dayKey(p.createdAt))
+      if (!same) {
+        merged.push(p)
+        continue
+      }
+      const titles = new Set(same.items.map((i) => i.title))
+      same.items = [...same.items, ...p.items.filter((i) => !titles.has(i.title))]
+      same.ids = [...same.ids, ...p.ids]
+      same.blog ||= p.blog
+    }
+    return merged.sort((a, b) => b.createdAt - a.createdAt)
+  }, [news])
 }
 /** 안 읽은 패치 노트 */
 export function useUnreadNews() {
@@ -160,7 +177,6 @@ export function NewsModal({ isAdmin, onClose, onLink }: { isAdmin: boolean; onCl
         {posts.length === 0 ? (
           <div className="py-10 text-center">
             <p className="text-sm text-muted-foreground">아직 올라온 소식이 없어요.</p>
-            {isAdmin && !writing && <StarterButton />}
           </div>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
@@ -199,7 +215,7 @@ export function NewsModal({ isAdmin, onClose, onLink }: { isAdmin: boolean; onCl
                         {p.blog && (
                           <a href={p.blog} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-muted">블로그에서 자세히<ExternalLink className="size-3" /></a>
                         )}
-                        {isAdmin && (
+                        {isAdmin && p.ids.length > 0 && (
                           <button
                             onClick={() => window.confirm(`'${p.title}' 소식을 지울까요? 되돌릴 수 없어요.`) && p.ids.forEach((id) => deleteNews(id))}
                             className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive"
@@ -217,45 +233,6 @@ export function NewsModal({ isAdmin, onClose, onLink }: { isAdmin: boolean; onCl
           <button onClick={() => setAll(true)} className="mt-2 w-full rounded-lg py-2 text-sm text-muted-foreground hover:bg-muted">지난 소식 더 보기</button>
         )}
       </div>
-    </div>
-  )
-}
-
-/** 11월 7일 블로그 '업데이트 내역' 글 내용 */
-const STARTER = {
-  title: '11월 7일 업데이트',
-  createdAt: new Date('2026-11-07T21:00:00+09:00').getTime(),
-  items: [
-    { kind: 'new', title: '사용법 안내', body: '처음 들어오면 카드 4장으로 사이트 사용법을 알려 줘요. 다시 보고 싶으면 곡 목록 위의 사용법 버튼을 누르세요.', link: 'help' },
-    { kind: 'new', title: '완주 도장과 도장 수첩', body: '한 난이도의 진행 막대를 꽉 채우면 곡 카드에 易·普·難 도장이 찍혀요. 완주하는 순간 完走 도장 창이 뜨고, 도장 수첩에서 모든 곡의 도장을 모아 볼 수 있어요.', link: 'stamps' },
-    { kind: 'new', title: '따라 말하기 (실험 기능)', body: "문장을 채점한 뒤 '따라 말하기'를 누르고 소리 내서 읽어 보세요. 원문과 발음을 비교해서 일치 %를 알려 줘요. 한자가 달라도 소리가 같으면 정답이에요. 내 목소리를 녹음해서 들어 볼 수도 있어요." },
-    { kind: 'improve', title: '보통 난이도 빈칸 개선', body: '답이 길면 입력칸이 좁아 글자가 잘리던 문제, 단어 중간에서 빈칸이 끊기던 문제, 조사까지 한 빈칸에 묶이던 문제를 고쳤어요.' },
-    { kind: 'improve', title: '결과 화면 자동 스크롤이 처음부터 켜져요', body: '노래를 들으며 확인할 때 화면이 부르는 문장을 따라 내려가요. 직접 끈 기기에서는 꺼진 채로 기억해요.' },
-  ] as NewsEntry[],
-}
-
-/** 관리자: 소식이 비어 있을 때 블로그 업데이트 내역으로 한 번에 채우기 */
-function StarterButton() {
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const fill = async () => {
-    setBusy(true)
-    setErr('')
-    try {
-      await postNews(STARTER)
-    } catch {
-      setErr('넣지 못했어요. Firebase 보안 규칙에 news 부분이 들어갔는지 확인해 주세요.')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="mt-4">
-      <button onClick={fill} disabled={busy} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-50">
-        {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}11월 7일 업데이트 내역 넣기
-      </button>
-      <p className="mt-2 text-xs text-muted-foreground">블로그에 올린 업데이트 내역(새 기능 3개, 개선 2개)이 글 하나로 들어가요.</p>
-      {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
     </div>
   )
 }
