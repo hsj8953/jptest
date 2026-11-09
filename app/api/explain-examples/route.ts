@@ -1,7 +1,7 @@
 // 문장 풀이의 단어·문법마다 실생활 예문을 만들어요 (관리자 전용)
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/server-auth'
-import { callGemini } from '@/lib/gemini'
+import { callGemini, FAST_MODELS } from '@/lib/gemini'
 
 export const runtime = 'nodejs'
 export const maxDuration = 130
@@ -13,7 +13,6 @@ For EVERY word and EVERY grammar point, write ONE example sentence used in daily
 - Short and natural: about 6~20 Japanese characters. Polite or casual everyday speech. Never quote or paraphrase song lyrics.
 - "ja": the sentence with furigana for EVERY kanji word written right after it in braces, like 毎日{まいにち}学校{がっこう}に行{い}きます。 Kana-only words get no braces.
 - "ko": a natural Korean translation (해요체 or 반말, matching the Japanese).
-- For particles (は, が, を, に…) and auxiliaries, write a simple sentence that shows the same usage.
 Return JSON {"items":[{"words":[{"ja","ko"}...],"grammar":[{"ja","ko"}...]}...]} with exactly one entry per input item, and inside it exactly one example per input word and per grammar point, in the same order.`
 
 const EX = { type: 'OBJECT', properties: { ja: { type: 'STRING' }, ko: { type: 'STRING' } }, required: ['ja', 'ko'] }
@@ -54,7 +53,8 @@ export async function POST(req: Request) {
     : []
   if (!items.length || items.length > 6) return NextResponse.json({ error: 'bad_request' }, { status: 400 })
 
-  const r = await callGemini(PROMPT, JSON.stringify({ items }), SCHEMA, 120000)
+  // 예문은 쉬운 작업이라 빠른 모델부터 써요
+  const r = await callGemini(PROMPT, JSON.stringify({ items }), SCHEMA, 110000, FAST_MODELS)
   if (!r.ok) return NextResponse.json({ error: r.error, detail: r.detail }, { status: r.status })
   const out = (r.json as { items?: unknown[] }).items ?? []
   return NextResponse.json({

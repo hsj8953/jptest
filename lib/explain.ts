@@ -44,10 +44,15 @@ export async function generateExplain(lines: Line[], onProgress?: (done: number,
   return { explains: out, error, detail, failed, total: need.length }
 }
 
-/** 예문이 하나라도 빠진 풀이인지 */
-export const needsExamples = (ex?: LineExplain) => !!ex && (ex.words.some((w) => !w.ex) || ex.grammar.some((g) => !g.ex))
+/** 예문을 붙일 단어: 조사·조동사·접미사·기호 같은 건 빼요 (뻔하고 시간만 걸려서) */
+const NO_EX_POS = new Set(['조사', '조동사', '접미사', '기타'])
+export const wantsExample = (w: { w: string; pos: string }) => !NO_EX_POS.has(w.pos) && /[\p{L}]/u.test(w.w)
 
-/** 문장 풀이의 단어·문법마다 실생활 예문 채우기 (이미 있는 예문은 그대로 둬요) */
+/** 예문이 하나라도 빠진 풀이인지 */
+export const needsExamples = (ex?: LineExplain) => !!ex && (ex.words.some((w) => wantsExample(w) && !w.ex) || ex.grammar.some((g) => !g.ex))
+
+/** 문장 풀이의 단어·문법마다 실생활 예문 채우기 (이미 있는 예문은 그대로 둬요)
+ *  - 3문장씩 묶어서 3묶음을 한꺼번에 보내요 (하나씩 기다리면 너무 오래 걸려서) */
 export async function generateExamples(lines: Line[], onProgress?: (done: number, total: number, note?: string) => void) {
   const out: (LineExplain | undefined)[] = lines.map((l) => l.explain)
   const need = lines.map((l, i) => (needsExamples(l.explain) ? i : -1)).filter((i) => i >= 0)
@@ -56,15 +61,26 @@ export async function generateExamples(lines: Line[], onProgress?: (done: number
   let failed = 0
   const token = await getFirebaseAuth().currentUser?.getIdToken()
   if (!token) return { explains: out, error: 'unauthorized', detail: '', failed: need.length, total: need.length }
-  const EX_CHUNK = 5
+  const EX_CHUNK = 3
+  const PARALLEL = 3
+  const chunks: number[][] = []
+  for (let s = 0; s < need.length; s += EX_CHUNK) chunks.push(need.slice(s, s + EX_CHUNK))
   let done = 0
   onProgress?.(0, need.length)
-  for (let s = 0; s < need.length; s += EX_CHUNK) {
-    const part = need.slice(s, s + EX_CHUNK)
+
+  const runChunk = async (part: number[]) => {
+    // 문장마다 예문이 필요한 단어만 보내고, 받은 걸 원래 자리에 돌려놔요
+    const pick = part.map((i) => lines[i].explain!.words.map((w, k) => (wantsExample(w) && !w.ex ? k : -1)).filter((k) => k >= 0))
     try {
       const json = await postAi<{ items: ({ words: ({ ja: string; ko: string } | null)[]; grammar: ({ ja: string; ko: string } | null)[] } | null)[] }>(
         '/api/explain-examples',
-        { items: part.map((i) => ({ line: answerOf(lines[i].ruby), words: lines[i].explain!.words.map((w) => ({ w: w.w, m: w.m })), grammar: lines[i].explain!.grammar.map((g) => g.title) })) },
+        {
+          items: part.map((i, j) => ({
+            line: answerOf(lines[i].ruby),
+            words: pick[j].map((k) => ({ w: lines[i].explain!.words[k].w, m: lines[i].explain!.words[k].m })),
+            grammar: lines[i].explain!.grammar.map((g) => g.title),
+          })),
+        },
         token,
         (sec) => onProgress?.(done, need.length, `Gemini가 바빠서 ${sec}초 뒤 다시 시도해요…`),
       )
@@ -75,9 +91,10 @@ export async function generateExamples(lines: Line[], onProgress?: (done: number
           failed++
           return
         }
+        const byIdx = new Map(pick[j].map((k, n) => [k, r.words[n]]))
         out[i] = {
           ...ex,
-          words: ex.words.map((w, k) => (w.ex || !r.words[k] ? w : { ...w, ex: r.words[k]! })),
+          words: ex.words.map((w, k) => (w.ex || !byIdx.get(k) ? w : { ...w, ex: byIdx.get(k)! })),
           grammar: ex.grammar.map((g, k) => (g.ex || !r.grammar[k] ? g : { ...g, ex: r.grammar[k]! })),
         }
       })
@@ -90,5 +107,10 @@ export async function generateExamples(lines: Line[], onProgress?: (done: number
       onProgress?.(done, need.length)
     }
   }
+  // 동시에 3묶음까지
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(PARALLEL, chunks.length) }, async () => {
+    while (next < chunks.length) await runChunk(chunks[next++])
+  }))
   return { explains: out, error, detail, failed, total: need.length }
 }
