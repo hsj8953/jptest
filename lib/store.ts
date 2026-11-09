@@ -354,3 +354,38 @@ export const actions = {
     await setDoc(doc(getDb(), 'config', 'access'), { emails })
   },
 }
+
+/* ── 관리자: 친구들 학습 현황 ─────────────────────────────
+   songs/{id}/scores/{uid} 에 쌓인 요약(닉네임, 난이도별 맞힌 문장/전체, 마지막 시각)만 읽어요.
+   친구가 적은 답 내용(users/{uid}/progress)은 읽지 않아요. */
+export type ScoreRow = {
+  uid: string
+  name: string
+  songId: string
+  at: number // 마지막으로 푼 시각 (ms), 모르면 0
+  d: Record<Difficulty, { ok: number; total: number }>
+}
+export async function loadAllScores(songIds: string[]): Promise<ScoreRow[]> {
+  const db = getDb()
+  const per = await Promise.all(
+    songIds.map(async (songId) => {
+      const snap = await getDocs(collection(db, 'songs', songId, 'scores'))
+      return snap.docs.map((s) => {
+        const v = s.data() as Record<string, unknown>
+        const pair = (x: unknown) => {
+          const o = (x ?? {}) as { ok?: number; total?: number }
+          return { ok: Number(o.ok) || 0, total: Number(o.total) || 0 }
+        }
+        const ts = v.updatedAt as { toMillis?: () => number } | undefined
+        return {
+          uid: s.id,
+          name: String(v.name ?? '이름 없음'),
+          songId,
+          at: ts?.toMillis?.() ?? 0,
+          d: { easy: pair(v.easy), normal: pair(v.normal), hard: pair({ ok: v.ok, total: v.total }) },
+        } satisfies ScoreRow
+      })
+    }),
+  )
+  return per.flat()
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { BookOpen, ChevronRight, CircleHelp, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { BookOpen, ChartNoAxesColumn, ChevronRight, CircleHelp, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore, type SongRequest } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -17,7 +17,7 @@ import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -28,6 +28,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onWrong: () => void
   onHelp: () => void
   onStampBook: () => void
+  onProgress?: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
   const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
@@ -78,6 +79,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           </Button>
           {isAdmin && (
             <>
+              <Button variant="outline" onClick={onProgress} className="h-10 px-3"><ChartNoAxesColumn data-icon="inline-start" />학습 현황</Button>
               <Button variant="outline" onClick={onInvite} className="relative h-10 px-3">
                 <UserPlus data-icon="inline-start" />친구 초대
                 {requests.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-5 text-white">{requests.length}</span>}

@@ -15,18 +15,19 @@ import { actions, isInvited, loadNickname, startSync, stopSync, useStore, type S
 import { NicknameForm } from '@/components/kakitori/nickname'
 import { Tutorial, shouldShowTutorial } from '@/components/kakitori/tutorial'
 import { CompletionWatcher, StampBook } from '@/components/kakitori/stamps'
+import { AdminProgress } from '@/components/kakitori/admin-progress'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
 import { WrongNote } from '@/components/kakitori/wrong-note'
 import { wrongItems } from '@/lib/wrong'
 
-type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab' | 'wrong'
+type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab' | 'wrong' | 'progress'
 type AuthState = 'loading' | 'out' | 'not-invited' | 'in'
 type Route = { view: View; id: string | null; line?: number | null; d?: Difficulty | null; w?: boolean }
 const DIFFS: Difficulty[] = ['easy', 'normal', 'hard']
 
 // 화면 위치를 주소(?v=study&song=곡ID)에 기록해서 새로고침 · 뒤로가기 · 링크 공유가 되게 해요
-const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab', 'wrong']
+const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab', 'wrong', 'progress']
 function readRoute(): Route {
   const p = new URLSearchParams(window.location.search)
   const v = p.get('v') as View | null
@@ -248,6 +249,7 @@ export default function Page() {
       onNew={() => { setPendingRequest(null); go('editor', null) }}
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
+      onProgress={() => go('progress', null)}
       onHelp={() => setTutOpen(true)}
       onStampBook={() => setBookOpen(true)}
       onRegisterRequest={(r) => { setPendingRequest(r); go('editor', null) }}
@@ -258,6 +260,7 @@ export default function Page() {
   const needsSong = view === 'study' || view === 'timing' || (view === 'editor' && !!selectedId)
   if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
+  else if (view === 'progress' && isAdmin) body = <AdminProgress onBack={goLibrary} onOpenSong={(id) => go('study', id)} />
   else if (view === 'wrong') body = <WrongNote isAdmin={isAdmin} onBack={goLibrary} onOpen={(it, q) => go('study', it.song.id, it.line, it.d, q)} />
   else if (view === 'vocab') body = <Vocab isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
   else if (view === 'editor' && isAdmin && (!selectedId || selected)) body = <Editor key={selectedId ?? `new-${pendingRequest?.id ?? ''}`} song={selected} request={selectedId ? null : pendingRequest} onBack={() => { setPendingRequest(null); goLibrary() }} onSaved={(id) => { setPendingRequest(null); go('timing', id) }} />
