@@ -59,6 +59,8 @@ function useDarkMode() {
   }, [])
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
+    // 기기가 다크 모드여도 사이트에서 라이트를 고르면 라이트 색을 쓰도록 (globals.css의 :root:not(.light))
+    document.documentElement.classList.toggle('light', !dark)
   }, [dark])
   const toggle = () => {
     setDark((d) => {

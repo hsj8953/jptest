@@ -35,7 +35,8 @@ export function AdminProgress({ onBack, onOpenSong }: { onBack: () => void; onOp
   const [rows, setRows] = useState<ScoreRow[] | null>(null)
   const [err, setErr] = useState('')
   const [tab, setTab] = useState<'people' | 'songs'>('people')
-  const [sel, setSel] = useState<string | null>(null)
+  // undefined = 아직 안 고름(맨 위 사람), null = 접음
+  const [sel, setSel] = useState<string | null | undefined>(undefined)
 
   const load = () => {
     setErr('')
@@ -88,7 +89,7 @@ export function AdminProgress({ onBack, onOpenSong }: { onBack: () => void; onOp
     ok: people.reduce((n, p) => n + p.ok, 0),
     stamps: people.reduce((n, p) => n + p.stamps.easy + p.stamps.normal + p.stamps.hard, 0),
   }
-  const selected = people.find((p) => p.uid === sel) ?? people[0]
+  const selected = sel === undefined ? people[0] : people.find((p) => p.uid === sel)
 
   const bySong = useMemo(() => {
     const m = new Map<string, ScoreRow[]>()
@@ -152,7 +153,8 @@ export function AdminProgress({ onBack, onOpenSong }: { onBack: () => void; onOp
                   return (
                     <div key={p.uid}>
                       <button
-                        onClick={() => setSel(p.uid)}
+                        onClick={() => setSel(on ? null : p.uid)}
+                        aria-expanded={on}
                         className={`grid w-full grid-cols-[1fr_5.5rem_3.5rem_4rem_1rem] items-center gap-2 border-b border-border px-4 py-3 text-left text-sm transition last:border-0 sm:grid-cols-[1fr_6rem_4rem_4.5rem_7rem_1rem] ${on ? 'bg-primary/[0.07] shadow-[inset_3px_0_0_var(--primary)]' : 'hover:bg-muted/50'}`}
                       >
                         <b className="truncate">{p.name}</b>
@@ -168,11 +170,9 @@ export function AdminProgress({ onBack, onOpenSong }: { onBack: () => void; onOp
                   )
                 })}
               </div>
-              {selected && (
-                <div className="hidden rounded-2xl border border-border bg-card p-5 lg:block">
-                  <PersonDetail p={selected} songOf={songOf} onOpenSong={onOpenSong} />
-                </div>
-              )}
+              <div className="hidden rounded-2xl border border-border bg-card p-5 lg:block">
+                {selected ? <PersonDetail p={selected} songOf={songOf} onOpenSong={onOpenSong} /> : <p className="py-16 text-center text-sm text-muted-foreground">왼쪽에서 친구를 고르면 곡별 진행이 나와요.</p>}
+              </div>
             </div>
           ) : (
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
