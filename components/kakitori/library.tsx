@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { BookOpen, ChartNoAxesColumn, ChevronRight, CircleHelp, Clock3, FilePenLine, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { BookOpen, ChartNoAxesColumn, ChevronRight, CircleHelp, Clock3, FilePenLine, FileText, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore, type SongRequest } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -13,6 +13,7 @@ import { ThemedCard } from './themed'
 import { wrongItems } from '@/lib/wrong'
 import { InstallBanner } from './install-banner'
 import { Stamp } from './stamps'
+import { BlogExport } from './blog-export'
 import { NewsBanner } from './news'
 import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
@@ -36,6 +37,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [exportId, setExportId] = useState<string | null>(null)
+  const exportSong = songs.find((x) => x.id === exportId)
   const [q, setQ] = useState('')
   const [reqOpen, setReqOpen] = useState(false)
   const wrongCount = useMemo(() => wrongItems(songs, progress, isAdmin).length, [songs, progress, isAdmin])
@@ -244,6 +247,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
                       <>
                         <button onClick={() => onTiming(song.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" title="타이밍 설정" aria-label="타이밍 설정"><Clock3 className="size-4" /></button>
                         <button onClick={() => onEdit(song.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" title="편집" aria-label="편집"><FilePenLine className="size-4" /></button>
+                        <button onClick={() => setExportId(song.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted" title="블로그용 내보내기" aria-label="블로그용 내보내기"><FileText className="size-4" /></button>
                         <button onClick={() => setConfirmDel(song.id)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-destructive" title="삭제" aria-label="삭제"><Trash2 className="size-4" /></button>
                       </>
                     )}
@@ -266,6 +270,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           )
         })}
       </div>
+    {exportSong && <BlogExport song={exportSong} onClose={() => setExportId(null)} />}
     </main>
   )
 }
