@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { LogOut, Menu, Moon, Pencil, Sun, X } from 'lucide-react'
 import type { User } from '@/lib/types'
 import { AppLogo } from './logo'
+import { NewsBell } from './news'
 
-export function Header({ user, dark, onHome, onDark, onLogout, onNickname }: { user: User; dark: boolean; onHome: () => void; onDark: () => void; onLogout: () => void; onNickname: () => void }) {
+export function Header({ user, dark, onHome, onDark, onLogout, onNickname, onNews }: { user: User; dark: boolean; onHome: () => void; onDark: () => void; onLogout: () => void; onNickname: () => void; onNews: () => void }) {
   const [open, setOpen] = useState(false)
   const initial = user.name.slice(0, 1)
   return (
@@ -18,7 +19,8 @@ export function Header({ user, dark, onHome, onDark, onLogout, onNickname }: { u
             <span className="font-jp text-[11px] text-muted-foreground">書き取りノート</span>
           </span>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <NewsBell onOpen={onNews} />
           <button onClick={onDark} className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-muted" aria-label={dark ? '라이트 모드로 전환' : '다크 모드로 전환'}>
             {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>

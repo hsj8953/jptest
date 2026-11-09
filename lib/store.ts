@@ -44,10 +44,15 @@ type State = {
   seenAdded: string[]
   /** 단어장 진도 (나만 봄) */
   vocab: VocabProgress
+  /** 업데이트 소식 (최근 것부터) */
+  news: NewsItem[]
   error: string | null
 }
 
-const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, error: null }
+const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, news: [], error: null }
+export type NewsKind = 'new' | 'improve' | 'fix'
+export type NewsLink = 'stamps' | 'vocab' | 'wrong' | 'help' | 'progress'
+export type NewsItem = { id: string; kind: NewsKind; title: string; body: string; link?: NewsLink | null; blog?: string | null; createdAt: number }
 let state: State = empty
 let me: User | null = null
 let unsubs: (() => void)[] = []
@@ -111,6 +116,14 @@ export function startSync(user: User) {
         progIn = true
         markReady()
       },
+    ),
+  )
+  // 업데이트 소식: 최근 30개
+  unsubs.push(
+    onSnapshot(
+      query(collection(db, 'news'), orderBy('createdAt', 'desc')),
+      (snap) => set({ news: snap.docs.slice(0, 30).map((d) => ({ id: d.id, ...(d.data() as Omit<NewsItem, 'id'>) })) }),
+      () => {}, // 규칙이 아직 없으면 조용히 비워 둬요
     ),
   )
   unsubs.push(
@@ -388,4 +401,13 @@ export async function loadAllScores(songIds: string[]): Promise<ScoreRow[]> {
     }),
   )
   return per.flat()
+}
+
+/* ── 업데이트 소식 (news/{id}): 멤버는 읽고, 관리자만 쓰고 지워요 ── */
+export async function postNews(n: Omit<NewsItem, 'id' | 'createdAt'>) {
+  const ref = doc(collection(getDb(), 'news'))
+  await setDoc(ref, { ...n, link: n.link ?? null, blog: n.blog?.trim() || null, createdAt: Date.now() })
+}
+export async function deleteNews(id: string) {
+  await deleteDoc(doc(getDb(), 'news', id))
 }

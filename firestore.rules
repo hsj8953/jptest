@@ -62,6 +62,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 업데이트 소식: 멤버는 읽기, 관리자만 쓰기
+    match /news/{id} {
+      allow read: if member();
+      allow write: if isAdmin();
+    }
+
     // 곡: 멤버는 읽기, 관리자만 쓰기
     match /songs/{songId} {
       allow read: if member();

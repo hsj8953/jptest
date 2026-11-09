@@ -16,6 +16,7 @@ import { NicknameForm } from '@/components/kakitori/nickname'
 import { Tutorial, shouldShowTutorial } from '@/components/kakitori/tutorial'
 import { CompletionWatcher, StampBook } from '@/components/kakitori/stamps'
 import { AdminProgress } from '@/components/kakitori/admin-progress'
+import { NewsModal } from '@/components/kakitori/news'
 import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
 import { WrongNote } from '@/components/kakitori/wrong-note'
@@ -80,6 +81,7 @@ export default function Page() {
   const [nickOpen, setNickOpen] = useState(false)
   const [tutOpen, setTutOpen] = useState(false)
   const [bookOpen, setBookOpen] = useState(false)
+  const [newsOpen, setNewsOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
@@ -252,6 +254,7 @@ export default function Page() {
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
       onProgress={() => go('progress', null)}
+      onNews={() => setNewsOpen(true)}
       onHelp={() => setTutOpen(true)}
       onStampBook={() => setBookOpen(true)}
       onRegisterRequest={(r) => { setPendingRequest(r); go('editor', null) }}
@@ -285,9 +288,21 @@ export default function Page() {
 
   return (
     <div className="app-paper min-h-screen">
-      <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} onNickname={() => setNickOpen(true)} />
+      <Header user={user} dark={dark} onHome={goLibrary} onDark={toggle} onLogout={logout} onNickname={() => setNickOpen(true)} onNews={() => setNewsOpen(true)} />
       {body}
       {tutOpen && <Tutorial onClose={() => setTutOpen(false)} />}
+      {newsOpen && (
+        <NewsModal
+          isAdmin={isAdmin}
+          onClose={() => setNewsOpen(false)}
+          onLink={(l) => {
+            setNewsOpen(false)
+            if (l === 'stamps') setBookOpen(true)
+            else if (l === 'help') setTutOpen(true)
+            else go(l, null)
+          }}
+        />
+      )}
       {view === 'study' && selected && diff && (
         <CompletionWatcher key={`${selected.id}-${diff}`} song={selected} d={diff} onNext={(d) => go('study', selected.id, null, d)} onBook={() => setBookOpen(true)} />
       )}

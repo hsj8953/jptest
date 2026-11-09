@@ -13,11 +13,12 @@ import { ThemedCard } from './themed'
 import { wrongItems } from '@/lib/wrong'
 import { InstallBanner } from './install-banner'
 import { Stamp } from './stamps'
+import { NewsBanner } from './news'
 import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -29,6 +30,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onHelp: () => void
   onStampBook: () => void
   onProgress?: () => void
+  onNews?: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
   const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
@@ -90,6 +92,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         </div>
       </div>
 
+      {onNews && <NewsBanner onOpen={onNews} />}
       <InstallBanner />
       {!isAdmin && <AddedNotice onOpen={(id) => onSelect(id)} />}
 
