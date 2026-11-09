@@ -46,6 +46,16 @@ const KIND: Record<NewsKind, { label: string; c: string }> = {
   fix: { label: '수정', c: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300' },
 }
 export const LINK_LABEL: Record<NewsLink, string> = { stamps: '도장 수첩 열기', vocab: '단어장 열기', wrong: '오답 노트 열기', help: '사용법 보기', progress: '학습 현황 열기' }
+/** 11월 7일 블로그 '업데이트 내역' 글 내용 (소식이 하나도 없을 때 관리자가 한 번에 넣을 수 있게) */
+const at = (hhmm: string) => new Date(`2026-11-07T${hhmm}:00+09:00`).getTime()
+const STARTER: (Omit<NewsItem, 'id' | 'createdAt'> & { createdAt: number })[] = [
+  { kind: 'improve', title: '결과 화면 자동 스크롤이 처음부터 켜져요', body: '노래를 들으며 확인할 때 화면이 부르는 문장을 따라 내려가요. 직접 끈 기기에서는 꺼진 채로 기억해요.', link: null, blog: null, createdAt: at('20:00') },
+  { kind: 'improve', title: '보통 난이도 빈칸 개선', body: '답이 길면 입력칸이 좁아 글자가 잘리던 문제, だいす|き처럼 단어 중간에서 빈칸이 끊기던 문제, 夢ならばど처럼 조사까지 한 빈칸에 묶이던 문제를 고쳤어요.', link: null, blog: null, createdAt: at('20:01') },
+  { kind: 'new', title: '사용법 안내', body: '처음 들어오면 카드 4장으로 사이트 사용법을 알려 줘요. 다시 보고 싶으면 곡 목록 위의 사용법 버튼을 누르세요.', link: 'help', blog: null, createdAt: at('20:02') },
+  { kind: 'new', title: '완주 도장과 도장 수첩', body: '한 난이도의 진행 막대를 꽉 채우면 곡 카드에 易·普·難 도장이 찍혀요. 완주하는 순간 完走 도장 창이 뜨고, 도장 수첩에서 모든 곡의 도장을 모아 볼 수 있어요.', link: 'stamps', blog: null, createdAt: at('20:03') },
+  { kind: 'new', title: '따라 말하기 (실험 기능)', body: "문장을 채점한 뒤 '따라 말하기'를 누르고 소리 내서 읽어 보세요. 원문과 발음을 비교해서 일치 %를 알려 줘요. 한자가 달라도 소리가 같으면 정답이에요. 내 목소리를 녹음해서 들어 볼 수도 있어요.", link: null, blog: null, createdAt: at('20:04') },
+]
+
 const fmt = (ms: number) => new Date(ms).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
 
 /** 헤더의 알림 버튼 */
@@ -120,7 +130,10 @@ export function NewsModal({ isAdmin, onClose, onLink }: { isAdmin: boolean; onCl
         {writing && <NewsForm onDone={() => setWriting(false)} />}
 
         {news.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">아직 올라온 소식이 없어요.</p>
+          <div className="py-10 text-center">
+            <p className="text-sm text-muted-foreground">아직 올라온 소식이 없어요.</p>
+            {isAdmin && !writing && <StarterButton />}
+          </div>
         ) : (
           <ul className="mt-3">
             {shown.map((n, i) => {
@@ -163,6 +176,32 @@ export function NewsModal({ isAdmin, onClose, onLink }: { isAdmin: boolean; onCl
           <button onClick={() => setAll(true)} className="mt-1 w-full rounded-lg py-2 text-sm text-muted-foreground hover:bg-muted">지난 소식 더 보기</button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** 관리자: 소식이 비어 있을 때 블로그 업데이트 내역으로 한 번에 채우기 */
+function StarterButton() {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const fill = async () => {
+    setBusy(true)
+    setErr('')
+    try {
+      for (const n of STARTER) await postNews(n)
+    } catch {
+      setErr('넣지 못했어요. Firebase 보안 규칙에 news 부분이 들어갔는지 확인해 주세요.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="mt-4">
+      <button onClick={fill} disabled={busy} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-50">
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}11월 7일 블로그 업데이트 내역으로 채우기
+      </button>
+      <p className="mt-2 text-xs text-muted-foreground">사용법 안내, 완주 도장, 따라 말하기 등 5개 소식이 들어가요.</p>
+      {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
     </div>
   )
 }

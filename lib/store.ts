@@ -404,9 +404,9 @@ export async function loadAllScores(songIds: string[]): Promise<ScoreRow[]> {
 }
 
 /* ── 업데이트 소식 (news/{id}): 멤버는 읽고, 관리자만 쓰고 지워요 ── */
-export async function postNews(n: Omit<NewsItem, 'id' | 'createdAt'>) {
+export async function postNews(n: Omit<NewsItem, 'id' | 'createdAt'> & { createdAt?: number }) {
   const ref = doc(collection(getDb(), 'news'))
-  await setDoc(ref, { ...n, link: n.link ?? null, blog: n.blog?.trim() || null, createdAt: Date.now() })
+  await setDoc(ref, { ...n, link: n.link ?? null, blog: n.blog?.trim() || null, createdAt: n.createdAt ?? Date.now() })
 }
 export async function deleteNews(id: string) {
   await deleteDoc(doc(getDb(), 'news', id))
