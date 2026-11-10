@@ -45,8 +45,14 @@ export async function generateExplain(lines: Line[], onProgress?: (done: number,
 }
 
 /** 예문을 붙일 단어: 조사·조동사·접미사·기호 같은 건 빼요 (뻔하고 시간만 걸려서) */
-const NO_EX_POS = new Set(['조사', '조동사', '접미사', '기타'])
-export const wantsExample = (w: { w: string; pos: string }) => !NO_EX_POS.has(w.pos) && /[\p{L}]/u.test(w.w)
+// 품사 이름이 '격조사', '조사(주격)'처럼 조금 달라도 걸러지게 글자가 들어 있는지로 봐요
+const NO_EX_POS = /조사|조동사|접미사|접두사|기타|기호/
+// 품사가 비어 있거나 틀려도: 가나 1~2글자짜리 조사·어미(は に を で が も と へ の や か ね よ た て だ…)는 빼요
+const SHORT_KANA = /^[ぁ-ゖー]{1,2}$/
+// (もう·まだ 같은 짧은 부사처럼 품사가 내용어로 분명히 적힌 건 남겨요)
+const CONTENT_POS = /명사|동사|형용|부사|감탄사|연체사|접속사/
+export const wantsExample = (w: { w: string; pos: string }) =>
+  !NO_EX_POS.test(w.pos ?? '') && !(SHORT_KANA.test(w.w) && !CONTENT_POS.test(w.pos ?? '')) && /[\p{L}]/u.test(w.w)
 
 /** 예문이 하나라도 빠진 풀이인지 */
 export const needsExamples = (ex?: LineExplain) => !!ex && (ex.words.some((w) => wantsExample(w) && !w.ex) || ex.grammar.some((g) => !g.ex))

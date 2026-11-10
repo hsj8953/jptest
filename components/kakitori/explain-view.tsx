@@ -6,6 +6,7 @@ import { speak } from '@/lib/words'
 import { readingsFromRuby } from '@/lib/ruby'
 import type { ExplainExample, Line } from '@/lib/types'
 import { Furigana } from './furigana'
+import { wantsExample } from '@/lib/explain'
 
 const POS_COLOR: Record<string, string> = {
   명사: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
@@ -97,7 +98,7 @@ export function ExplainBody({ ex, ruby }: { ex: NonNullable<Line['explain']>; ru
               <span className="order-last col-span-3 min-w-0 text-sm sm:order-none sm:col-span-1">
                 {w.m}
                 {w.note && <span className="mt-0.5 block text-xs text-primary">{w.note}</span>}
-                {w.ex && <Example ex={w.ex} />}
+                {w.ex && wantsExample(w) && <Example ex={w.ex} />}
               </span>
               <Volume2 className="size-3.5 text-muted-foreground opacity-60 transition sm:opacity-0 sm:group-hover:opacity-100" />
             </button>
