@@ -1,5 +1,7 @@
 'use client'
 
+// [VOICEVOX 꺼 둠 · 2026-11-10] 지금은 화면에 안 나와요 (vocab.tsx에서 주석 처리). 코드만 남겨 둬요.
+
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Mic, Play, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'

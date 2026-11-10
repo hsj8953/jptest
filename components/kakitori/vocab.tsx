@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button'
 import { actions, useStore } from '@/lib/store'
 import { HIRAGANA, KATAKANA, cellsOf, type KanaCell, type KanaGroup } from '@/lib/kana'
 import { canSpeak, hasJapaneseVoice, speak, wordKey } from '@/lib/words'
-import { getVolume, loadVoiceConfig, setVolume } from '@/lib/voice'
-import { VoicePanel } from './voice-panel'
+import { getVolume, setVolume } from '@/lib/voice'
+// [VOICEVOX 꺼 둠] 관리자 음성 만들기 패널과 음성 출처 표시
+// import { loadVoiceConfig } from '@/lib/voice'
+// import { VoicePanel } from './voice-panel'
 import type { Song } from '@/lib/types'
 
 type Tab = 'hira' | 'kata' | 'words'
@@ -65,18 +67,18 @@ function SpeakButton({ text, className = '' }: { text: string; className?: strin
   )
 }
 
-/** VOICEVOX 음성 출처 (사용 조건) — 음성이 없으면 기기 음성 안내 */
+/** 발음 안내: 기기에 일본어 음성이 없으면 알려 주고, 볼륨 조절 */
 function VoiceCredit() {
-  const [credit, setCredit] = useState<string | null | undefined>(undefined)
-  useEffect(() => {
-    loadVoiceConfig().then((c) => setCredit(c?.credit ?? null))
-  }, [])
+  // [VOICEVOX 꺼 둠] 예전에는 VOICEVOX 설정을 읽어서 '음성: ○○' 출처를 보여 줬어요
+  // const [credit, setCredit] = useState<string | null | undefined>(undefined)
+  // useEffect(() => {
+  //   loadVoiceConfig().then((c) => setCredit(c?.credit ?? null))
+  // }, [])
   return (
     <>
-      {credit === null && <NoVoiceNotice />}
+      <NoVoiceNotice />
       <div className="mb-3 flex items-center justify-end gap-3 text-[11px] text-muted-foreground">
         <VolumeControl />
-        {credit && <span>음성: {credit}</span>}
       </div>
     </>
   )
@@ -185,7 +187,7 @@ export function Vocab({ onBack, onGoLine, initialTab, isAdmin = false }: { onBac
           ]}
         />
       </div>
-      {isAdmin && <VoicePanel />}
+      {/* [VOICEVOX 꺼 둠] {isAdmin && <VoicePanel />} */}
       <VoiceCredit />
       {tab === 'hira' && <KanaTab key="hira" groups={HIRAGANA} name="히라가나" />}
       {tab === 'kata' && <KanaTab key="kata" groups={KATAKANA} name="가타카나" />}

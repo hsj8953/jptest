@@ -6,7 +6,9 @@ import { getFirebaseAuth } from './firebase'
 import { postAi, type AiError } from './ai-client'
 import { KANJI, answerOf } from './ruby'
 import type { Line, SongWord } from './types'
-import { getVolume, playStored } from './voice'
+import { getVolume } from './voice'
+// VOICEVOX 음성은 잠시 꺼 뒀어요 (가나 발음이 어색해서 기기 음성으로 되돌림). 다시 켜려면 아래 줄과 speak()의 주석을 푸세요.
+// import { playStored } from './voice'
 
 const KEEP_POS = new Set(['名詞', '動詞', '形容詞', '副詞', '連体詞'])
 const SKIP_DETAIL = new Set(['数', '非自立', '接尾'])
@@ -140,8 +142,9 @@ export function speak(text: string, rate = 0.9) {
     synth.speak(u)
   }
   const fallback = () => (jaVoice !== undefined ? say() : voicesReady().then(say))
-  // VOICEVOX로 만들어 둔 음성이 있으면 그걸 먼저 들려줘요 (없으면 기기 음성)
   synth.cancel()
-  playStored(text).then((ok) => ok || fallback(), fallback)
+  // [VOICEVOX 꺼 둠] 만들어 둔 VOICEVOX 음성이 있으면 그걸 먼저 들려주던 부분
+  // playStored(text).then((ok) => ok || fallback(), fallback)
+  fallback()
   return true
 }

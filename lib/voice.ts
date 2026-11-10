@@ -1,5 +1,8 @@
 'use client'
 
+// [VOICEVOX 꺼 둠 · 2026-11-10] 지금은 쓰지 않아요. 발음은 기기에 들어 있는 일본어 음성으로 읽어요(lib/words.ts speak).
+// 볼륨(getVolume/setVolume)만 계속 써요. 다시 켜려면 words.ts·vocab.tsx·editor.tsx의 '[VOICEVOX 꺼 둠]' 주석을 푸세요.
+
 // 단어장 발음: VOICEVOX로 미리 만들어 Firestore에 저장한 음성을 모두가 똑같이 들어요.
 //   config/voice        { speaker, credit }   지금 쓰는 목소리 (관리자가 고름)
 //   audio/{id}          { text, speaker, wav } 음성 파일 (wav를 base64로)

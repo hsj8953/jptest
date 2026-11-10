@@ -12,7 +12,8 @@ import { parseYouTubeId } from '@/lib/youtube'
 import type { Line, Song, SongWord } from '@/lib/types'
 import { WordEditor } from './word-editor'
 import { ExplainEditor } from './explain-editor'
-import { generateAudio, loadVoiceConfig, vvAvailable } from '@/lib/voice'
+// [VOICEVOX 꺼 둠] 저장할 때 단어 음성 만들기
+// import { generateAudio, loadVoiceConfig, vvAvailable } from '@/lib/voice'
 import { BackButton, Furigana } from './furigana'
 
 // 붙여넣은 가사의 부수·호환 한자는 일반 한자로 정리해요
@@ -129,16 +130,16 @@ export function Editor({ song, request, onBack, onSaved }: { song?: Song; reques
       await actions.saveSong({ id, title: title.trim(), artist: artist.trim(), youtubeId, lines, words: cleanWords, createdAt: song?.createdAt ?? Date.now() })
       // 곡 신청으로 만든 곡이면 신청을 '추가됨'으로 (친구에게 알림)
       if (request && !song) await actions.markSongRequestAdded(request.id, id, title.trim()).catch(() => {})
-      // VOICEVOX가 켜져 있으면 이 곡 단어 음성도 같이 만들어요 (꺼져 있으면 그냥 넘어가요)
-      const texts = cleanWords.map((w) => w.reading || w.word)
-      const voice = texts.length ? await loadVoiceConfig() : null
-      if (voice && (await vvAvailable())) {
-        try {
-          await generateAudio(texts, voice.speaker, (d, t) => setSaveMsg(`저장했어요. 단어 음성 만드는 중… ${d} / ${t}`))
-        } catch {
-          // 음성은 나중에 단어장의 '음성 만들기'에서 다시 만들 수 있어요
-        }
-      }
+      // [VOICEVOX 꺼 둠] VOICEVOX가 켜져 있으면 이 곡 단어 음성도 같이 만들던 부분
+      // const texts = cleanWords.map((w) => w.reading || w.word)
+      // const voice = texts.length ? await loadVoiceConfig() : null
+      // if (voice && (await vvAvailable())) {
+      //   try {
+      //     await generateAudio(texts, voice.speaker, (d, t) => setSaveMsg(`저장했어요. 단어 음성 만드는 중… ${d} / ${t}`))
+      //   } catch {
+      //     // 음성은 나중에 단어장의 '음성 만들기'에서 다시 만들 수 있어요
+      //   }
+      // }
       onSaved(id)
     } catch {
       setError('저장하지 못했어요. 관리자 계정인지, 인터넷이 연결돼 있는지 확인해 주세요.')
