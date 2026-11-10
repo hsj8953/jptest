@@ -88,6 +88,7 @@ function usePosts() {
       same.items = [...same.items, ...p.items.filter((i) => !titles.has(i.title))]
       same.ids = [...same.ids, ...p.ids]
       same.blog ||= p.blog
+      same.createdAt = Math.max(same.createdAt, p.createdAt)
     }
     return merged.sort((a, b) => b.createdAt - a.createdAt)
   }, [news])

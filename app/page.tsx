@@ -186,11 +186,13 @@ export default function Page() {
     signOut(getFirebaseAuth())
   }
 
-  if (!firebaseConfigured) return <SetupNeeded />
   // 처음 들어온 사람: 닉네임까지 정하고 곡 목록에 오면 사용법 안내를 한 번 보여 줘요
+  // (훅은 조건부 return보다 위에 있어야 해요)
   useEffect(() => {
     if (auth === 'in' && user?.name && !nickOpen && view === 'library' && shouldShowTutorial()) setTutOpen(true)
   }, [auth, user?.name, nickOpen, view])
+
+  if (!firebaseConfigured) return <SetupNeeded />
 
   if (auth === 'loading') {
     return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground">불러오는 중…</main>

@@ -158,24 +158,8 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
         song={song}
         progress={prog}
         onBack={onBack}
-        onReview={(k) => {
-          const d = drafts.current[k]
-          setAnswer(d?.answer ?? '')
-          setTranslation(d?.translation ?? '')
-          setResult(null)
-          setCurrent(k)
-          setShowResults(false)
-          window.scrollTo(0, 0)
-        }}
-        onRestart={() => {
-          actions.saveProgress(song.id, {}, difficulty, graded).catch(() => {})
-          drafts.current = {}
-          setAnswer('')
-          setTranslation('')
-          setResult(null)
-          setCurrent(0)
-          setShowResults(false)
-        }}
+        onReview={reviewAt}
+        onRestart={restartAll}
       />
     )
   }
