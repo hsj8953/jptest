@@ -51,7 +51,7 @@ type State = {
 
 const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, news: [], error: null }
 export type NewsKind = 'new' | 'improve' | 'fix'
-export type NewsLink = 'stamps' | 'vocab' | 'wrong' | 'help' | 'progress'
+export type NewsLink = 'stamps' | 'vocab' | 'wrong' | 'help' | 'progress' | 'grammar'
 /** 패치 노트 한 줄 */
 export type NewsEntry = { kind: NewsKind; title: string; body?: string; link?: NewsLink | null }
 /** 소식 글 하나 = 한 번의 업데이트(패치 노트). 예전 형식(글 하나에 한 줄)도 읽을 수 있게 kind/body를 남겨 둬요 */

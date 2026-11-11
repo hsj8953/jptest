@@ -41,7 +41,7 @@ const KIND: Record<NewsKind, { label: string; c: string }> = {
   fix: { label: '수정', c: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300' },
 }
 const KIND_ORDER: NewsKind[] = ['new', 'improve', 'fix']
-export const LINK_LABEL: Record<NewsLink, string> = { stamps: '도장 수첩 열기', vocab: '단어장 열기', wrong: '오답 노트 열기', help: '사용법 보기', progress: '학습 현황 열기' }
+export const LINK_LABEL: Record<NewsLink, string> = { stamps: '도장 수첩 열기', vocab: '단어장 열기', wrong: '오답 노트 열기', help: '사용법 보기', progress: '학습 현황 열기', grammar: '문법 모음 열기' }
 const dayKey = (ms: number) => new Date(ms).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
 const dayTitle = (ms: number) => `${new Date(ms).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', timeZone: 'Asia/Seoul' })} 업데이트`
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Seoul' })
