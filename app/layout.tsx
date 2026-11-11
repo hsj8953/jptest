@@ -1,5 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -37,6 +38,9 @@ export const viewport: Viewport = {
   ],
 }
 
+// Google Analytics 4: Vercel 환경 변수 NEXT_PUBLIC_GA_ID(G-로 시작하는 측정 ID)를 넣으면 켜져요. 없으면 아무것도 안 해요.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -47,6 +51,14 @@ export default function RootLayout({
       <body className="antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'production' && GA_ID && (
+          <>
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+            <Script id="ga4" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`}
+            </Script>
+          </>
+        )}
       </body>
     </html>
   )
