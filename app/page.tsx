@@ -21,23 +21,21 @@ import type { Difficulty, User } from '@/lib/types'
 import { DifficultyPicker } from '@/components/kakitori/difficulty-picker'
 import { WrongNote } from '@/components/kakitori/wrong-note'
 import { wrongItems } from '@/lib/wrong'
-import { ReviewBar, ReviewDone } from '@/components/kakitori/review'
 import { GrammarBook } from '@/components/kakitori/grammar'
-import { REVIEW_MAX, loadSession, markDoneToday, reviewPlan, saveSession, type ReviewSession } from '@/lib/review'
 
-type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab' | 'wrong' | 'progress' | 'review' | 'grammar'
+type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab' | 'wrong' | 'progress' | 'grammar'
 type AuthState = 'loading' | 'out' | 'not-invited' | 'in'
-type Route = { view: View; id: string | null; line?: number | null; d?: Difficulty | null; w?: boolean; r?: boolean }
+type Route = { view: View; id: string | null; line?: number | null; d?: Difficulty | null; w?: boolean }
 const DIFFS: Difficulty[] = ['easy', 'normal', 'hard']
 
 // 화면 위치를 주소(?v=study&song=곡ID)에 기록해서 새로고침 · 뒤로가기 · 링크 공유가 되게 해요
-const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab', 'wrong', 'progress', 'review', 'grammar']
+const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab', 'wrong', 'progress', 'grammar']
 function readRoute(): Route {
   const p = new URLSearchParams(window.location.search)
   const v = p.get('v') as View | null
   const line = p.get('line')
   const d = p.get('d') as Difficulty | null
-  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song'), line: line != null && /^\d+$/.test(line) ? Number(line) : null, d: d && DIFFS.includes(d) ? d : null, w: p.get('w') === '1', r: p.get('r') === '1' }
+  return { view: v && VIEWS.includes(v) ? v : 'library', id: p.get('song'), line: line != null && /^\d+$/.test(line) ? Number(line) : null, d: d && DIFFS.includes(d) ? d : null, w: p.get('w') === '1' }
 }
 function routeUrl(r: Route) {
   if (r.view === 'library') return window.location.pathname
@@ -46,7 +44,6 @@ function routeUrl(r: Route) {
   if (r.line != null) p.set('line', String(r.line))
   if (r.d) p.set('d', r.d)
   if (r.w) p.set('w', '1')
-  if (r.r) p.set('r', '1')
   return `${window.location.pathname}?${p.toString()}`
 }
 
@@ -96,8 +93,6 @@ export default function Page() {
   const [line, setLine] = useState<number | null>(null)
   const [diff, setDiff] = useState<Difficulty | null>(null)
   const [wrongQueue, setWrongQueue] = useState(false)
-  const [reviewing, setReviewing] = useState(false)
-  const [session, setSession] = useState<ReviewSession | null>(null)
   const [pendingRequest, setPendingRequest] = useState<SongRequest | null>(null)
   const { dark, toggle } = useDarkMode()
 
@@ -109,8 +104,6 @@ export default function Page() {
       setLine(r.line ?? null)
       setDiff(r.d ?? null)
       setWrongQueue(!!r.w)
-      setReviewing(!!r.r)
-      setSession(r.r ? loadSession() : null)
     }
     apply()
     const onPop = () => {
@@ -228,10 +221,9 @@ export default function Page() {
 
   const isAdmin = user.isAdmin
   const selected = songs.find((s) => s.id === selectedId)
-  const go = (v: View, id: string | null = selectedId, ln: number | null = null, d: Difficulty | null = null, w = false, r = false) => {
-    const url = routeUrl({ view: v, id, line: ln, d, w, r })
+  const go = (v: View, id: string | null = selectedId, ln: number | null = null, d: Difficulty | null = null, w = false) => {
+    const url = routeUrl({ view: v, id, line: ln, d, w })
     setWrongQueue(w)
-    setReviewing(r)
     if (url !== window.location.pathname + window.location.search) window.history.pushState(null, '', url)
     setSelectedId(id)
     setLine(ln)
@@ -254,35 +246,6 @@ export default function Page() {
     if (n) go('study', n.song.id, n.line, n.d, true)
     else go('wrong', null)
   }
-  // 오늘의 복습: 지금 복습할 문장을 골라 하나씩 풀어요
-  const startReview = () => {
-    const due = reviewPlan(songs, progress, isAdmin).due.slice(0, REVIEW_MAX)
-    if (!due.length) return
-    const s: ReviewSession = { items: due.map((it) => ({ id: it.song.id, line: it.line, d: it.d })), i: 0, startedAt: Date.now() }
-    saveSession(s)
-    setSession(s)
-    go('study', s.items[0].id, s.items[0].line, s.items[0].d, false, true)
-  }
-  const nextReviewItem = () => {
-    const s = session ?? loadSession()
-    if (!s) return go('review', null)
-    let i = s.i + 1
-    while (i < s.items.length && !songs.some((x) => x.id === s.items[i].id)) i++
-    if (i >= s.items.length) {
-      markDoneToday()
-      return go('review', null)
-    }
-    const n = { ...s, i }
-    saveSession(n)
-    setSession(n)
-    go('study', n.items[i].id, n.items[i].line, n.items[i].d, false, true)
-  }
-  const quitReview = () => {
-    saveSession(null)
-    setSession(null)
-    goLibrary()
-  }
-
   const library = (
     <Library
       isAdmin={isAdmin}
@@ -294,7 +257,6 @@ export default function Page() {
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
       onProgress={() => go('progress', null)}
-      onReview={startReview}
       onGrammar={() => go('grammar', null)}
       onNews={() => setNewsOpen(true)}
       onHelp={() => setTutOpen(true)}
@@ -308,7 +270,6 @@ export default function Page() {
   if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
   else if (view === 'progress' && isAdmin) body = <AdminProgress onBack={goLibrary} onOpenSong={(id) => go('study', id)} />
-  else if (view === 'review') body = <ReviewDone isAdmin={isAdmin} onBack={quitReview} onMore={startReview} />
   else if (view === 'grammar') body = <GrammarBook isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
   else if (view === 'wrong') body = <WrongNote isAdmin={isAdmin} onBack={goLibrary} onOpen={(it, q) => go('study', it.song.id, it.line, it.d, q)} />
   else if (view === 'vocab') body = <Vocab isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
@@ -316,24 +277,6 @@ export default function Page() {
   else if (view === 'timing' && isAdmin && selected) body = <Timing key={selected.id} song={selected} onBack={goLibrary} onStudy={(id) => go('study', id)} onEdit={(id) => go('editor', id)} />
   else if (view === 'study' && selected && !diff)
     body = <DifficultyPicker song={selected} onBack={goLibrary} onPick={(d) => go('study', selected.id, line, d)} />
-  else if (view === 'study' && selected && diff && reviewing && session)
-    body = (
-      <>
-        <ReviewBar pos={session.i + 1} total={session.items.length} onQuit={quitReview} />
-        <Study
-          key={`${selected.id}-${diff}-${line ?? ''}-r${session.i}`}
-          song={selected}
-          user={user}
-          difficulty={diff}
-          initialLine={line}
-          fresh
-          onBack={quitReview}
-          onChangeDifficulty={() => go('study', selected.id, null, null)}
-          onNextWrong={nextReviewItem}
-          nextLabel={session.i + 1 >= session.items.length ? '복습 결과 보기' : '다음 복습'}
-        />
-      </>
-    )
   else if (view === 'study' && selected && diff)
     body = (
       <Study

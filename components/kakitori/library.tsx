@@ -15,12 +15,11 @@ import { InstallBanner } from './install-banner'
 import { Stamp } from './stamps'
 import { BlogExport } from './blog-export'
 import { NewsBanner } from './news'
-import { ReviewCard } from './review'
 import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews, onReview, onGrammar }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews, onGrammar }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -33,7 +32,6 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onStampBook: () => void
   onProgress?: () => void
   onNews?: () => void
-  onReview?: () => void
   onGrammar?: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
@@ -122,8 +120,6 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           <span className="text-xs font-semibold text-primary">확인하기 →</span>
         </button>
       )}
-
-      {onReview && <ReviewCard isAdmin={isAdmin} onStart={onReview} />}
 
       {recent && recentSong && (
         <ContinueBanner
