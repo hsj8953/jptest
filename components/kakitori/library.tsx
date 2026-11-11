@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { BookOpen, ChartNoAxesColumn, ChevronRight, CircleHelp, Clock3, FilePenLine, FileText, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { BookOpen, ChartNoAxesColumn, SpellCheck, ChevronRight, CircleHelp, Clock3, FilePenLine, FileText, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore, type SongRequest } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -15,11 +15,12 @@ import { InstallBanner } from './install-banner'
 import { Stamp } from './stamps'
 import { BlogExport } from './blog-export'
 import { NewsBanner } from './news'
+import { ReviewCard } from './review'
 import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews, onReview, onGrammar }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
@@ -32,6 +33,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onStampBook: () => void
   onProgress?: () => void
   onNews?: () => void
+  onReview?: () => void
+  onGrammar?: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
   const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
@@ -76,6 +79,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={onHelp} className="h-10 px-3"><CircleHelp data-icon="inline-start" />사용법</Button>
           <Button variant="outline" onClick={onVocab} className="h-10 px-3"><BookOpen data-icon="inline-start" />단어장</Button>
+          {onGrammar && <Button variant="outline" onClick={onGrammar} className="h-10 px-3"><SpellCheck data-icon="inline-start" />문법 모음</Button>}
           <Button variant="outline" onClick={onStampBook} className="h-10 px-3"><Stamp d="normal" on className="mr-0.5 size-5 text-[10px] shadow-none" />도장 수첩</Button>
           <Button variant="outline" onClick={onWrong} className="h-10 px-3"><NotebookPen data-icon="inline-start" />오답 노트{wrongCount > 0 && <span className="ml-0.5 rounded-full bg-destructive/10 px-1.5 text-xs font-bold text-destructive tabular-nums">{wrongCount}</span>}</Button>
           <Button variant="outline" onClick={() => setReqOpen(true)} className="relative h-10 px-3">
@@ -118,6 +122,8 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           <span className="text-xs font-semibold text-primary">확인하기 →</span>
         </button>
       )}
+
+      {onReview && <ReviewCard isAdmin={isAdmin} onStart={onReview} />}
 
       {recent && recentSong && (
         <ContinueBanner

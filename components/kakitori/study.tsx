@@ -9,6 +9,7 @@ import { diffChars, type DiffChar } from '@/lib/diff'
 import { useYouTube } from '@/lib/youtube'
 import { DIFFICULTY_LABEL, type Difficulty, type LineProgress, type Song, type User } from '@/lib/types'
 import { gradedLines } from '@/lib/blanks'
+import { withReview } from '@/lib/review'
 import { BlankCard, ListenOnlyCard } from './blank-card'
 import { BlankResults } from './blank-results'
 import { BackButton, Furigana, ProgressBar } from './furigana'
@@ -21,7 +22,7 @@ type Result = { ok: boolean; input: string; revealed: boolean; restored?: boolea
 
 const HINT_KEY = 'kakitori.hint.listen.v1'
 
-export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty, onNextWrong }: {
+export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty, onNextWrong, nextLabel = '다음 오답', fresh = false }: {
   song: Song
   user: User
   onBack: () => void
@@ -30,6 +31,10 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   onChangeDifficulty?: () => void
   /** 오답 노트에서 '연달아 풀기'로 들어왔을 때: 다음 오답으로 */
   onNextWrong?: () => void
+  /** onNextWrong 버튼 글자 */
+  nextLabel?: string
+  /** 복습: 처음 문장은 예전 답을 지우고 새로 풀어요 */
+  fresh?: boolean
 }) {
   const { progress } = useStore()
   const prog = progress[progKey(song.id, difficulty)] ?? {}
@@ -51,9 +56,10 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     if (q.ok && input) return { ok: true, input, revealed: false, restored: true }
     return null
   }
-  const [answer, setAnswer] = useState(() => prog[current]?.answer ?? '')
+  const [freshLine] = useState(() => (fresh ? current : null))
+  const [answer, setAnswer] = useState(() => (fresh ? '' : prog[current]?.answer ?? ''))
   const [translation, setTranslation] = useState(() => prog[current]?.translation ?? '')
-  const [result, setResult] = useState<Result | null>(() => (difficulty === 'hard' ? savedResult(prog[current]) : null))
+  const [result, setResult] = useState<Result | null>(() => (difficulty === 'hard' && !fresh ? savedResult(prog[current]) : null))
   const [repeat, setRepeat] = useState(false)
   const [speed, setSpeed] = useState('1')
   const [showResults, setShowResults] = useState(false)
@@ -202,11 +208,11 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
       return
     }
     const ok = sameAnswer(input, answerOf(sentence.ruby))
-    save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim() } })
+    save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim(), ...withReview(p, ok) } })
     setResult({ ok, input, revealed: false })
   }
   const reveal = () => {
-    save({ ...prog, [current]: { ...p, revealed: true, last: false, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation } })
+    save({ ...prog, [current]: { ...p, revealed: true, last: false, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation, ...withReview(p, false) } })
     setResult({ ok: false, input: normalizeAnswer(answer), revealed: true })
   }
   const retry = () => {
@@ -216,7 +222,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
 
   const isLast = current === total - 1
   const nextButton = onNextWrong ? (
-    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={onNextWrong}>다음 오답<ChevronRight data-icon="inline-end" /></Button>
+    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={onNextWrong}>{nextLabel}<ChevronRight data-icon="inline-end" /></Button>
   ) : isLast && allDone ? (
     <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
   ) : isLast ? (
@@ -416,9 +422,9 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
               song={song}
               lineIndex={current}
               mode={difficulty}
-              prev={p}
-              onGrade={(ok, answers, ko) => save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, blanks: answers, translation: ko } })}
-              onReveal={(ko) => save({ ...prog, [current]: { ...p, revealed: true, last: false, translation: ko || p.translation } })}
+              prev={current === freshLine ? { translation: p.translation } : p}
+              onGrade={(ok, answers, ko) => save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, blanks: answers, translation: ko, ...withReview(p, ok) } })}
+              onReveal={(ko) => save({ ...prog, [current]: { ...p, revealed: true, last: false, translation: ko || p.translation, ...withReview(p, false) } })}
               nav={(g, retryFn) => navButtons(!!g?.ok, retryFn)}
             />
           ) : (

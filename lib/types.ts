@@ -56,7 +56,12 @@ export type LineProgress = {
   translation?: string
   /** 쉬움·보통: 빈칸마다 내가 고르거나 쓴 답 */
   blanks?: string[]
+  /** 오늘의 복습 일정 */
+  rv?: ReviewState
 }
+
+/** 복습 일정: s = 단계(0: 1일, 1: 3일, 2: 7일, 3: 14일), due = 복습할 날(ms), done = 외움 */
+export type ReviewState = { s: number; due: number; done?: boolean }
 
 /** 받아쓰기 난이도: 쉬움(빈칸 고르기) · 보통(빈칸 쓰기) · 어려움(문장 전체 받아쓰기) */
 export type Difficulty = 'easy' | 'normal' | 'hard'
