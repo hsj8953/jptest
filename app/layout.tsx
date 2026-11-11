@@ -38,8 +38,8 @@ export const viewport: Viewport = {
   ],
 }
 
-// Google Analytics 4: Vercel 환경 변수 NEXT_PUBLIC_GA_ID(G-로 시작하는 측정 ID)를 넣으면 켜져요. 없으면 아무것도 안 해요.
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID
+// Google Analytics 4 측정 ID (공개돼도 괜찮은 값). Vercel 환경 변수 NEXT_PUBLIC_GA_ID가 있으면 그 값을 써요.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-LECTJFJZR8'
 
 export default function RootLayout({
   children,
