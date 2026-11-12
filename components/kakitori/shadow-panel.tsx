@@ -82,12 +82,27 @@ function ShadowBody({ song, ruby, rec, mic }: { song: Song; ruby: string; rec: b
         gotRef.current = { text, conf: last[0].confidence, alts }
       }
     }
+    let lastText = ''
+    let failed = false
+    const onres = r.onresult
+    r.onresult = (e) => {
+      onres?.(e)
+      let t = ''
+      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript
+      lastText = t
+    }
     r.onerror = (e) => {
-      if (e.error !== 'aborted') setErr(SPEECH_ERR[e.error] ?? `음성 인식 오류: ${e.error}`)
+      if (e.error === 'aborted') return
+      failed = true
+      setErr(SPEECH_ERR[e.error] ?? `음성 인식 오류: ${e.error}`)
     }
     r.onend = () => {
       setListening(false)
       if (gotRef.current) setSaid(gotRef.current)
+      // 일부 안드로이드 크롬은 '확정' 신호 없이 끝나요. 들린 글자가 있으면 그걸로 채점해요
+      else if (lastText.trim()) setSaid({ text: lastText, conf: 0, alts: [lastText] })
+      // 오류도 결과도 없이 끝나면 아무 반응이 없는 것처럼 보여서, 왜 그런지 알려 줘요
+      else if (!failed) setErr('아무 소리도 인식하지 못했어요. 다른 앱(카카오톡 통화, 디스코드 등)이 마이크를 쓰고 있지 않은지, 크롬 설정에서 맞는 마이크가 선택돼 있는지 확인해 주세요.')
     }
     recRef.current = r
     try {
