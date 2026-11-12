@@ -118,3 +118,17 @@ export function readingsFromRuby(ruby: string, words: string[]): (string | null)
     return span.map((c) => c.read).join('')
   })
 }
+
+/** 단어와 그 읽기를 한자 부분에만 후리가나가 붙는 표기로 바꿔요. 예) 抱きしめて + だきしめて → 抱{だ}きしめて
+ *  가나 부분을 기준으로 읽기를 나눠요. 맞출 수 없으면 단어 전체에 읽기를 붙여요. */
+export function rubyOf(text: string, reading: string) {
+  if (!reading || !KANJI.test(text)) return text
+  const kata2hira = (s: string) => s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+  const runs = text.match(/[㐀-䶿一-鿿豈-﫿々〆ヶ]+|[^㐀-䶿一-鿿豈-﫿々〆ヶ]+/g) ?? [text]
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp('^' + runs.map((r) => (KANJI.test(r) ? '(.+?)' : esc(kata2hira(r)))).join('') + '$')
+  const m = kata2hira(reading).match(re)
+  if (!m) return `${text}{${reading}}`
+  let g = 1
+  return runs.map((r) => (KANJI.test(r) ? `${r}{${m[g++]}}` : r)).join('')
+}

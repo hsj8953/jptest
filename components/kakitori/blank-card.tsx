@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { blankCorrect, blanksFor, choiceReading, choicesFor } from '@/lib/blanks'
-import { normalizeKanji } from '@/lib/ruby'
+import { normalizeKanji, rubyOf } from '@/lib/ruby'
 import type { LineProgress, Song } from '@/lib/types'
 import { Furigana } from './furigana'
 import { ExplainPanel } from './explain-view'
@@ -141,10 +141,9 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
               return (
                 <span key={k} className="relative mx-0.5 inline-flex flex-col items-center align-middle leading-tight">
                   {!right && answers[b] && !graded.revealed && <span className="text-sm text-destructive line-through">{answers[b]}</span>}
-                  <ruby className={`rounded-md px-1.5 ${right ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-destructive/10 text-destructive'}`}>
-                    {ans.text}
-                    <rt className="text-[0.5em] text-muted-foreground">{ans.reading || choiceReading(song, ans.text)}</rt>
-                  </ruby>
+                  <span className={`rounded-md px-1.5 ${right ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-destructive/10 text-destructive'}`}>
+                    <Furigana text={rubyOf(ans.text, ans.reading || choiceReading(song, ans.text))} />
+                  </span>
                 </span>
               )
             }
@@ -205,10 +204,7 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
                 className={`min-h-14 rounded-xl border px-3 py-2 font-jp text-lg leading-[2.2] transition hover:border-primary/60 hover:bg-muted ${answers[active] === c ? 'border-primary bg-primary/10' : 'border-border bg-background'}`}
               >
                 {choiceReading(song, c) && list.every((x) => choiceReading(song, x) || !/[\u3400-\u9FFF々]/.test(x)) ? (
-                  <ruby>
-                    {c}
-                    <rt className="text-[0.55em] text-muted-foreground">{choiceReading(song, c)}</rt>
-                  </ruby>
+                  <Furigana text={rubyOf(c, choiceReading(song, c))} />
                 ) : (
                   c
                 )}
