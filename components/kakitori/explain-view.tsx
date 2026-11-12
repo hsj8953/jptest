@@ -136,9 +136,9 @@ export function ExplainBody({ ex, ruby }: { ex: NonNullable<Line['explain']>; ru
 /** 실생활 예문 한 줄 (작게) */
 function Example({ ex }: { ex: ExplainExample }) {
   return (
-    <span className="mt-1.5 block rounded-lg bg-background/70 px-2 py-1 text-xs leading-5 text-muted-foreground">
+    <span className="mt-2 block rounded-lg bg-background/70 px-2.5 py-1.5 text-[13px] leading-6 text-muted-foreground sm:text-sm">
       <span className="mr-1 font-semibold text-foreground/70">예)</span>
-      <span className="font-jp text-[13px] leading-[1.9] text-foreground/90"><Furigana text={ex.ja} /></span>
+      <span className="font-jp text-base leading-[2.1] text-foreground/90 sm:text-[17px] [&_rt]:text-[0.55em]"><Furigana text={ex.ja} /></span>
       <span className="block">{ex.ko}</span>
     </span>
   )
