@@ -7,11 +7,11 @@ import { Library } from '@/components/kakitori/library'
 import { Study } from '@/components/kakitori/study'
 import { Editor } from '@/components/kakitori/editor'
 import { Timing } from '@/components/kakitori/timing'
-import { Invite } from '@/components/kakitori/invite'
+import { Users } from '@/components/kakitori/users'
 import { Vocab } from '@/components/kakitori/vocab'
-import { Login, NotInvited, SetupNeeded } from '@/components/kakitori/login'
+import { Blocked, Login, SetupNeeded } from '@/components/kakitori/login'
 import { ADMIN_EMAIL, firebaseConfigured, getFirebaseAuth, googleProvider } from '@/lib/firebase'
-import { actions, isInvited, loadNickname, startSync, stopSync, useStore, type SongRequest } from '@/lib/store'
+import { actions, isBlocked, loadNickname, startSync, stopSync, touchMember, useStore, type SongRequest } from '@/lib/store'
 import { NicknameForm } from '@/components/kakitori/nickname'
 import { Tutorial, shouldShowTutorial } from '@/components/kakitori/tutorial'
 import { CompletionWatcher, StampBook } from '@/components/kakitori/stamps'
@@ -23,13 +23,13 @@ import { WrongNote } from '@/components/kakitori/wrong-note'
 import { wrongItems } from '@/lib/wrong'
 import { GrammarBook } from '@/components/kakitori/grammar'
 
-type View = 'library' | 'study' | 'editor' | 'timing' | 'invite' | 'vocab' | 'wrong' | 'progress' | 'grammar'
-type AuthState = 'loading' | 'out' | 'not-invited' | 'in'
+type View = 'library' | 'study' | 'editor' | 'timing' | 'users' | 'vocab' | 'wrong' | 'progress' | 'grammar'
+type AuthState = 'loading' | 'out' | 'blocked' | 'in'
 type Route = { view: View; id: string | null; line?: number | null; d?: Difficulty | null; w?: boolean }
 const DIFFS: Difficulty[] = ['easy', 'normal', 'hard']
 
 // 화면 위치를 주소(?v=study&song=곡ID)에 기록해서 새로고침 · 뒤로가기 · 링크 공유가 되게 해요
-const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'invite', 'vocab', 'wrong', 'progress', 'grammar']
+const VIEWS: View[] = ['library', 'study', 'editor', 'timing', 'users', 'vocab', 'wrong', 'progress', 'grammar']
 function readRoute(): Route {
   const p = new URLSearchParams(window.location.search)
   const v = p.get('v') as View | null
@@ -87,7 +87,7 @@ export default function Page() {
   const [email, setEmail] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const [loginError, setLoginError] = useState('')
-  const { songs, ready, progress } = useStore()
+  const { songs, ready, progress, blocked } = useStore()
   const [view, setView] = useState<View>('library')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [line, setLine] = useState<number | null>(null)
@@ -136,18 +136,11 @@ export default function Page() {
       const em = (u.email ?? '').toLowerCase()
       setEmail(em)
       const isAdmin = !!ADMIN_EMAIL && em === ADMIN_EMAIL
-      let allowed = isAdmin
-      if (!allowed) {
-        try {
-          allowed = await isInvited(em)
-        } catch {
-          allowed = false
-        }
-      }
-      if (!allowed) {
+      // 승인 없이 누구나 쓸 수 있고, 관리자가 차단한 사람만 막아요
+      if (!isAdmin && (await isBlocked(u.uid))) {
         stopSync()
         setUser(null)
-        setAuth('not-invited')
+        setAuth('blocked')
         return
       }
       // 친구들 기록에는 구글 이름 대신 직접 정한 닉네임이 보여요
@@ -158,6 +151,7 @@ export default function Page() {
         nick = null
       }
       const me: User = { uid: u.uid, name: nick ?? '', email: em, isAdmin }
+      touchMember(me).catch(() => {})
       setUser(me)
       setNickOpen(!nick)
       if (nick) startSync(me)
@@ -199,7 +193,7 @@ export default function Page() {
     return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   }
   if (auth === 'out') return <Login onLogin={login} busy={loginBusy} error={loginError} />
-  if (auth === 'not-invited') return <NotInvited email={email} uid={getFirebaseAuth().currentUser?.uid ?? ''} onLogout={logout} onApproved={() => window.location.reload()} />
+  if (auth === 'blocked' || (user && !user.isAdmin && blocked.includes(user.uid))) return <Blocked email={email} onLogout={logout} />
   if (!user) return null
   if (nickOpen) {
     const first = !user.name
@@ -252,7 +246,7 @@ export default function Page() {
       onSelect={(id, d) => go('study', id, null, d ?? null)}
       onEdit={(id) => go('editor', id)}
       onTiming={(id) => go('timing', id)}
-      onInvite={() => go('invite', null)}
+      onUsers={() => go('users', null)}
       onNew={() => { setPendingRequest(null); go('editor', null) }}
       onVocab={() => go('vocab', null)}
       onWrong={() => go('wrong', null)}
@@ -268,7 +262,7 @@ export default function Page() {
   let body = library
   const needsSong = view === 'study' || view === 'timing' || (view === 'editor' && !!selectedId)
   if (needsSong && !ready) body = <main className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">불러오는 중…</main>
-  else if (view === 'invite' && isAdmin) body = <Invite onBack={goLibrary} />
+  else if (view === 'users' && isAdmin) body = <Users me={user.uid} onBack={goLibrary} />
   else if (view === 'progress' && isAdmin) body = <AdminProgress onBack={goLibrary} onOpenSong={(id) => go('study', id)} />
   else if (view === 'grammar') body = <GrammarBook isAdmin={isAdmin} onBack={goLibrary} onGoLine={(id, ln) => go('study', id, ln)} />
   else if (view === 'wrong') body = <WrongNote isAdmin={isAdmin} onBack={goLibrary} onOpen={(it, q) => go('study', it.song.id, it.line, it.d, q)} />

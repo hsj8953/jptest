@@ -1,16 +1,16 @@
 'use client'
 
 // Firestore 저장소
-//   config/access                  { emails: [...] }          초대 목록
+//   config/blocked                 { uids: [...] }            차단한 사람 (로그인한 사람은 누구나 쓸 수 있고, 여기 있는 사람만 막아요)
+//   members/{uid}                  로그인한 사람 목록 (이메일·닉네임·처음/마지막 접속, 관리자만 봄)
 //   songs/{songId}                 곡 정보 · 문장 · 타이밍
 //   songs/{songId}/scores/{uid}    친구별 점수 (모두가 봄)
 //   users/{uid}/progress/{songId}  내 진도 · 내가 쓴 답 (나만 봄)
 //   songRequests/{유튜브ID}         곡 신청 (신청한 사람과 관리자만 봄)
-//   requests/{uid}                 초대 안 된 사람의 승인 요청 (관리자만 봄)
 //   users/{uid}/meta/profile       내 닉네임 (친구들 기록에는 이 이름이 보여요)
 
 import { useSyncExternalStore } from 'react'
-import { arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { getDb } from './firebase'
 import type { Difficulty, Song, SongProgress, User, VocabProgress } from './types'
 
@@ -27,7 +27,7 @@ const toSongRequest = (id: string, x: Record<string, unknown>): SongRequest => (
   songTitle: x.songTitle ? String(x.songTitle) : undefined,
 })
 
-export type AccessRequest = { uid: string; email: string; name: string; createdAt: number }
+export type Member = { uid: string; email: string; name: string; firstAt: number; lastAt: number }
 
 type State = {
   ready: boolean
@@ -35,9 +35,10 @@ type State = {
   progress: Record<string, SongProgress>
   /** 곡별 마지막으로 공부한 시각 (ms) — 이어서 하기에 써요 */
   touched: Record<string, number>
-  invites: string[]
-  /** 승인 요청 (관리자만) */
-  requests: AccessRequest[]
+  /** 차단한 사람 uid */
+  blocked: string[]
+  /** 로그인한 사람 목록 (관리자만) */
+  members: Member[]
   /** 곡 신청: 관리자는 대기 중인 전체, 친구는 내 신청 중 추가된 것 */
   songRequests: SongRequest[]
   /** 친구: 이미 확인한 '추가됐어요' 알림 */
@@ -49,7 +50,7 @@ type State = {
   error: string | null
 }
 
-const empty: State = { ready: false, songs: [], progress: {}, touched: {}, invites: [], requests: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, news: [], error: null }
+const empty: State = { ready: false, songs: [], progress: {}, touched: {}, blocked: [], members: [], songRequests: [], seenAdded: [], vocab: { words: {}, kana: {} }, news: [], error: null }
 export type NewsKind = 'new' | 'improve' | 'fix'
 export type NewsLink = 'stamps' | 'vocab' | 'wrong' | 'help' | 'progress' | 'grammar'
 /** 패치 노트 한 줄 */
@@ -172,20 +173,23 @@ export function startSync(user: User) {
       ),
     )
   }
+  unsubs.push(
+    onSnapshot(
+      doc(db, 'config', 'blocked'),
+      (s) => set({ blocked: ((s.data()?.uids as string[] | undefined) ?? []).slice() }),
+      () => {},
+    ),
+  )
   if (user.isAdmin) {
     unsubs.push(
       onSnapshot(
-        doc(db, 'config', 'access'),
-        (s) => set({ invites: ((s.data()?.emails as string[] | undefined) ?? []).slice() }),
-        () => {},
-      ),
-      onSnapshot(
-        collection(db, 'requests'),
+        collection(db, 'members'),
         (snap) =>
           set({
-            requests: snap.docs
-              .map((d) => ({ uid: d.id, email: String(d.data().email ?? ''), name: String(d.data().name ?? ''), createdAt: Number(d.data().createdAt ?? 0) }))
-              .sort((a, b) => a.createdAt - b.createdAt),
+            members: snap.docs.map((d) => {
+              const x = d.data()
+              return { uid: d.id, email: String(x.email ?? ''), name: String(x.name ?? ''), firstAt: Number(x.firstAt ?? 0), lastAt: Number(x.lastAt ?? 0) }
+            }),
           }),
         () => {},
       ),
@@ -200,33 +204,22 @@ export function stopSync() {
   set(empty)
 }
 
-/** 초대 목록에 있는 이메일인지 확인 */
-export async function isInvited(email: string) {
-  const s = await getDoc(doc(getDb(), 'config', 'access'))
-  const emails = ((s.data()?.emails as string[] | undefined) ?? []).map((e) => e.toLowerCase())
-  return emails.includes(email.toLowerCase())
-}
-
-/** 초대 안 된 사람: 내 승인 요청 보내기 / 확인 / 승인되면 알림 */
-export async function sendAccessRequest(uid: string, email: string, name: string) {
-  await setDoc(doc(getDb(), 'requests', uid), { email: email.toLowerCase(), name: name.trim().slice(0, 20), createdAt: Date.now() })
-}
-export async function hasAccessRequest(uid: string) {
+/** 차단된 사람인지 확인 (확인하지 못하면 막지 않아요. 진짜 막는 건 보안 규칙이에요) */
+export async function isBlocked(uid: string) {
   try {
-    return (await getDoc(doc(getDb(), 'requests', uid))).exists()
+    const s = await getDoc(doc(getDb(), 'config', 'blocked'))
+    return ((s.data()?.uids as string[] | undefined) ?? []).includes(uid)
   } catch {
     return false
   }
 }
-export function watchInvited(email: string, cb: () => void) {
-  return onSnapshot(
-    doc(getDb(), 'config', 'access'),
-    (s) => {
-      const emails = ((s.data()?.emails as string[] | undefined) ?? []).map((e) => e.toLowerCase())
-      if (emails.includes(email.toLowerCase())) cb()
-    },
-    () => {},
-  )
+
+/** 로그인할 때마다 사용자 목록에 나를 남겨요 (처음 온 날, 마지막 접속) */
+export async function touchMember(user: User) {
+  const ref = doc(getDb(), 'members', user.uid)
+  const now = Date.now()
+  const cur = await getDoc(ref)
+  await setDoc(ref, { email: user.email, name: user.name.slice(0, 20), firstAt: cur.exists() ? Number(cur.data().firstAt ?? now) : now, lastAt: now })
 }
 
 type Pair = { ok: number; total: number }
@@ -255,7 +248,7 @@ export function watchScores(songId: string, cb: (scores: Score[]) => void) {
           const x = d.data()
           const pair = (v: unknown): Pair | undefined => (v && typeof v === 'object' ? { ok: Number((v as Pair).ok ?? 0), total: Number((v as Pair).total ?? 0) } : undefined)
           return { uid: d.id, name: String(x.name ?? '친구'), ok: Number(x.ok ?? 0), total: Number(x.total ?? 0), easy: pair(x.easy), normal: pair(x.normal) }
-        }),
+        }).filter((sc) => !state.blocked.includes(sc.uid)), // 차단한 사람은 순위표에서 숨겨요
       ),
     () => cb([]),
   )
@@ -325,6 +318,7 @@ export const actions = {
     const db = getDb()
     await setDoc(doc(db, 'users', uid, 'meta', 'profile'), { nickname: name, updatedAt: serverTimestamp() }, { merge: true })
     if (me && me.uid === uid) me = { ...me, name }
+    await setDoc(doc(db, 'members', uid), { name }, { merge: true }).catch(() => {})
     const songs = await getDocs(collection(db, 'songs'))
     await Promise.all(
       songs.docs.map(async (sd) => {
@@ -366,17 +360,12 @@ export const actions = {
     set({ seenAdded: seen })
     await setDoc(doc(getDb(), 'users', me.uid, 'meta', 'songRequests'), { seen })
   },
-  /** 승인: 초대 목록에 넣고 요청을 지워요 */
-  async approveRequest(r: AccessRequest) {
-    const email = r.email.toLowerCase()
-    if (!state.invites.includes(email)) await setDoc(doc(getDb(), 'config', 'access'), { emails: [...state.invites, email] })
-    await deleteDoc(doc(getDb(), 'requests', r.uid))
+  /** 관리자: 차단 / 차단 풀기 */
+  async block(uid: string) {
+    await setDoc(doc(getDb(), 'config', 'blocked'), { uids: arrayUnion(uid) }, { merge: true })
   },
-  async rejectRequest(uid: string) {
-    await deleteDoc(doc(getDb(), 'requests', uid))
-  },
-  async setInvites(emails: string[]) {
-    await setDoc(doc(getDb(), 'config', 'access'), { emails })
+  async unblock(uid: string) {
+    await setDoc(doc(getDb(), 'config', 'blocked'), { uids: arrayRemove(uid) }, { merge: true })
   },
 }
 

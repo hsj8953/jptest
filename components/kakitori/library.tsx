@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { BookOpen, ChartNoAxesColumn, SpellCheck, ChevronRight, CircleHelp, Clock3, FilePenLine, FileText, Music2, NotebookPen, Play, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { BookOpen, ChartNoAxesColumn, SpellCheck, ChevronRight, CircleHelp, Clock3, FilePenLine, FileText, Music2, NotebookPen, Play, Plus, Search, Trash2, UsersRound, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { actions, countCorrectIn, parseProgKey, progKey, useStore, type SongRequest } from '@/lib/store'
 import { gradedLines } from '@/lib/blanks'
@@ -19,12 +19,12 @@ import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
 
 const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
-export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews, onGrammar }: {
+export function Library({ isAdmin, onSelect, onEdit, onTiming, onUsers, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews, onGrammar }: {
   isAdmin: boolean
   onSelect: (id: string, d?: Difficulty) => void
   onEdit: (id: string) => void
   onTiming: (id: string) => void
-  onInvite: () => void
+  onUsers: () => void
   onNew: () => void
   onVocab: () => void
   onWrong: () => void
@@ -35,7 +35,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
   onGrammar?: () => void
   onRegisterRequest: (r: SongRequest) => void
 }) {
-  const { songs, progress, touched, ready, error, requests, songRequests } = useStore()
+  const { songs, progress, touched, ready, error, songRequests } = useStore()
   const [delError, setDelError] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const [exportId, setExportId] = useState<string | null>(null)
@@ -87,10 +87,7 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
           {isAdmin && (
             <>
               <Button variant="outline" onClick={onProgress} className="h-10 px-3"><ChartNoAxesColumn data-icon="inline-start" />학습 현황</Button>
-              <Button variant="outline" onClick={onInvite} className="relative h-10 px-3">
-                <UserPlus data-icon="inline-start" />친구 초대
-                {requests.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-destructive px-1 text-[11px] font-bold leading-5 text-white">{requests.length}</span>}
-              </Button>
+              <Button variant="outline" onClick={onUsers} className="h-10 px-3"><UsersRound data-icon="inline-start" />사용자 관리</Button>
               <Button onClick={onNew} className="h-10 px-3"><Plus data-icon="inline-start" />새 곡 등록</Button>
             </>
           )}
@@ -112,14 +109,6 @@ export function Library({ isAdmin, onSelect, onEdit, onTiming, onInvite, onNew, 
       {reqOpen && (isAdmin
         ? <SongRequestList onClose={() => setReqOpen(false)} onRegister={(r) => { setReqOpen(false); onRegisterRequest(r) }} />
         : <SongRequestModal onClose={() => setReqOpen(false)} />)}
-
-      {isAdmin && requests.length > 0 && (
-        <button onClick={onInvite} className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-left text-sm transition hover:bg-primary/15">
-          <UserPlus className="size-4 shrink-0 text-primary" />
-          <span className="flex-1"><b>승인 요청 {requests.length}건</b>이 기다리고 있어요.</span>
-          <span className="text-xs font-semibold text-primary">확인하기 →</span>
-        </button>
-      )}
 
       {recent && recentSong && (
         <ContinueBanner

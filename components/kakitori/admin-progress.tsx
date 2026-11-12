@@ -31,7 +31,7 @@ function ago(ms: number) {
 type Person = { uid: string; name: string; at: number; rows: ScoreRow[]; ok: number; stamps: Record<Difficulty, number> }
 
 export function AdminProgress({ onBack, onOpenSong }: { onBack: () => void; onOpenSong: (id: string) => void }) {
-  const { songs, invites } = useStore()
+  const { songs, members } = useStore()
   const [rows, setRows] = useState<ScoreRow[] | null>(null)
   const [err, setErr] = useState('')
   const [tab, setTab] = useState<'people' | 'songs'>('people')
@@ -137,7 +137,7 @@ export function AdminProgress({ onBack, onOpenSong }: { onBack: () => void; onOp
               </div>
             ))}
           </div>
-          {invites.length > 0 && <p className="mt-2 text-xs text-muted-foreground">초대한 친구 {invites.length}명 · 한 문장이라도 맞힌 사람만 아래에 나와요.</p>}
+          {members.length > 0 && <p className="mt-2 text-xs text-muted-foreground">가입한 사람 {members.length}명 · 한 문장이라도 맞힌 사람만 아래에 나와요.</p>}
 
           {people.length === 0 ? (
             <p className="mt-16 text-center text-sm text-muted-foreground">아직 공부 기록이 없어요.</p>

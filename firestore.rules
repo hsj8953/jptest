@@ -9,27 +9,28 @@ service cloud.firestore {
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function email() { return request.auth.token.email.lower(); }
     function isAdmin() { return signedIn() && email() == "ADMIN_EMAIL_HERE".lower(); }
-    function invited() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/config/access)
-        && email() in get(/databases/$(database)/documents/config/access).data.emails;
+    // 차단한 사람 (관리자는 막히지 않아요)
+    function blocked() {
+      return exists(/databases/$(database)/documents/config/blocked)
+        && request.auth.uid in get(/databases/$(database)/documents/config/blocked).data.uids;
     }
-    function member() { return isAdmin() || invited(); }
+    // 승인 없이, 로그인한 사람은 차단만 안 됐으면 누구나 써요
+    function member() { return isAdmin() || (signedIn() && !blocked()); }
 
-    // 초대 목록: 로그인한 사람은 자기가 초대됐는지 확인만, 수정은 관리자만
-    match /config/access {
+    // 차단 목록: 로그인한 사람은 자기가 막혔는지 확인만, 수정은 관리자만
+    match /config/blocked {
       allow read: if signedIn();
       allow write: if isAdmin();
     }
 
-    // 승인 요청: 로그인한 사람은 자기 요청만 만들고 볼 수 있고, 목록 보기·처리는 관리자만
-    match /requests/{uid} {
+    // 사용자 목록: 로그인할 때 자기 문서만 남기고(이메일·닉네임·처음/마지막 접속), 목록 보기는 관리자만
+    match /members/{uid} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow create, update: if signedIn() && request.auth.uid == uid
+      allow create, update: if member() && request.auth.uid == uid
         && request.resource.data.email == email()
-        && request.resource.data.keys().hasOnly(['email', 'name', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['email', 'name', 'firstAt', 'lastAt'])
         && request.resource.data.name is string && request.resource.data.name.size() <= 20;
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow delete: if isAdmin();
     }
 
     // 곡 신청: 문서 이름은 유튜브 영상 ID. 신청한 사람과 관리자만 보고,
