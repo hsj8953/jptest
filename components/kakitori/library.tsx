@@ -10,14 +10,12 @@ import type { Song } from '@/lib/types'
 import { ProgressBar } from './furigana'
 import { ContinueBanner } from './continue-banner'
 import { ThemedCard } from './themed'
-import { wrongItems } from '@/lib/wrong'
+import { isTimed, wrongItems } from '@/lib/wrong'
 import { InstallBanner } from './install-banner'
 import { Stamp } from './stamps'
 import { BlogExport } from './blog-export'
 import { NewsBanner } from './news'
 import { AddedNotice, SongRequestList, SongRequestModal } from './song-request'
-
-const isTimed = (s: Song) => s.lines.length > 0 && s.lines.every((l) => l.start != null)
 
 export function Library({ isAdmin, onSelect, onEdit, onTiming, onUsers, onNew, onVocab, onWrong, onRegisterRequest, onHelp, onStampBook, onProgress, onNews, onGrammar }: {
   isAdmin: boolean

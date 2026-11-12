@@ -10,7 +10,7 @@ import { useYouTube } from '@/lib/youtube'
 import { DIFFICULTY_LABEL, type Difficulty, type LineProgress, type Song, type User } from '@/lib/types'
 import { gradedLines } from '@/lib/blanks'
 import { withReview } from '@/lib/review'
-import { BlankCard, ListenOnlyCard } from './blank-card'
+import { BlankCard, Hanko, ListenOnlyCard } from './blank-card'
 import { BlankResults } from './blank-results'
 import { BackButton, Furigana, ProgressBar } from './furigana'
 import { themeStyle, useSongHue } from '@/lib/theme'
@@ -22,7 +22,7 @@ type Result = { ok: boolean; input: string; revealed: boolean; restored?: boolea
 
 const HINT_KEY = 'kakitori.hint.listen.v1'
 
-export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty, onNextWrong, nextLabel = '다음 오답', fresh = false }: {
+export function Study({ song, user, onBack, initialLine, difficulty = 'hard', onChangeDifficulty, onNextWrong }: {
   song: Song
   user: User
   onBack: () => void
@@ -31,10 +31,6 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   onChangeDifficulty?: () => void
   /** 오답 노트에서 '연달아 풀기'로 들어왔을 때: 다음 오답으로 */
   onNextWrong?: () => void
-  /** onNextWrong 버튼 글자 */
-  nextLabel?: string
-  /** 복습: 처음 문장은 예전 답을 지우고 새로 풀어요 */
-  fresh?: boolean
 }) {
   const { progress, blocked } = useStore()
   const prog = progress[progKey(song.id, difficulty)] ?? {}
@@ -56,10 +52,9 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     if (q.ok && input) return { ok: true, input, revealed: false, restored: true }
     return null
   }
-  const [freshLine] = useState(() => (fresh ? current : null))
-  const [answer, setAnswer] = useState(() => (fresh ? '' : prog[current]?.answer ?? ''))
+  const [answer, setAnswer] = useState(() => prog[current]?.answer ?? '')
   const [translation, setTranslation] = useState(() => prog[current]?.translation ?? '')
-  const [result, setResult] = useState<Result | null>(() => (difficulty === 'hard' && !fresh ? savedResult(prog[current]) : null))
+  const [result, setResult] = useState<Result | null>(() => (difficulty === 'hard' ? savedResult(prog[current]) : null))
   const [repeat, setRepeat] = useState(false)
   const [speed, setSpeed] = useState('1')
   const [showResults, setShowResults] = useState(false)
@@ -177,9 +172,10 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   const canPlay = !!song.youtubeId && yt.ready && sentence.start != null
   segRef.current = { start: sentence.start, end: () => endOf(current), loop: repeat }
 
-  const save = (next: typeof prog) => {
+  // 지금 문장의 채점 결과만 저장해요
+  const save = (lp: LineProgress) => {
     setSaveError('')
-    actions.saveProgress(song.id, next, difficulty, graded).catch(() => setSaveError('기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
+    actions.saveLine(song.id, difficulty, current, lp, graded).catch(() => setSaveError('기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
   }
 
   const move = (k: number) => {
@@ -208,11 +204,11 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
       return
     }
     const ok = sameAnswer(input, answerOf(sentence.ruby))
-    save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim(), ...withReview(p, ok) } })
+    save({ ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, answer: input, translation: translation.trim(), ...withReview(p, ok) })
     setResult({ ok, input, revealed: false })
   }
   const reveal = () => {
-    save({ ...prog, [current]: { ...p, revealed: true, last: false, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation, ...withReview(p, false) } })
+    save({ ...p, revealed: true, last: false, answer: p.answer ?? answer.trim(), translation: translation.trim() || p.translation, ...withReview(p, false) })
     setResult({ ok: false, input: normalizeAnswer(answer), revealed: true })
   }
   const retry = () => {
@@ -222,7 +218,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
 
   const isLast = current === total - 1
   const nextButton = onNextWrong ? (
-    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={onNextWrong}>{nextLabel}<ChevronRight data-icon="inline-end" /></Button>
+    <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={onNextWrong}>다음 오답<ChevronRight data-icon="inline-end" /></Button>
   ) : isLast && allDone ? (
     <Button className="h-12 w-full text-base sm:h-10 sm:w-auto sm:flex-1 sm:text-sm" onClick={openResults}><Trophy data-icon="inline-start" />결과 보기</Button>
   ) : isLast ? (
@@ -326,22 +322,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
               {result && !result.revealed && <span className={result.ok ? 'stamp stamp-ok' : 'stamp stamp-no'}>{result.ok ? '〇 정답' : '✕ 오답'}</span>}
             </div>
             <div className={`relative ${result && !result.revealed ? (result.ok ? 'answer-ok' : result.restored ? 'answer-no' : 'answer-no stamp-shake') : ''} ${result?.restored ? 'restored' : ''}`} key={`wrap-${current}-${p.tries ?? 0}`}>
-            {result && !result.revealed && (
-              <span className={`hanko ${result.ok ? 'hanko-ok' : 'hanko-no'} ${result.restored ? 'hanko-static' : ''}`} role="img" aria-label={result.ok ? '정답 도장' : '오답 도장'}>
-                <svg viewBox="0 0 100 100" aria-hidden="true">
-                  <circle className="hanko-rim" cx="50" cy="50" r="45" />
-                  {result.ok ? (
-                    <circle className="hanko-mark" cx="50" cy="50" r="24" pathLength={1} />
-                  ) : (
-                    <>
-                      <path className="hanko-mark" d="M32 32 L68 68" pathLength={1} />
-                      <path className="hanko-mark hanko-mark-2" d="M68 32 L32 68" pathLength={1} />
-                    </>
-                  )}
-                </svg>
-                <span className="hanko-label">{result.ok ? '正解' : '不正解'}</span>
-              </span>
-            )}
+            {result && !result.revealed && <Hanko ok={result.ok} still={result.restored} />}
             <textarea
               id="jp-answer"
               ref={answerRef}
@@ -422,9 +403,9 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
               song={song}
               lineIndex={current}
               mode={difficulty}
-              prev={current === freshLine ? { translation: p.translation } : p}
-              onGrade={(ok, answers, ko) => save({ ...prog, [current]: { ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, blanks: answers, translation: ko, ...withReview(p, ok) } })}
-              onReveal={(ko) => save({ ...prog, [current]: { ...p, revealed: true, last: false, translation: ko || p.translation, ...withReview(p, false) } })}
+              prev={p}
+              onGrade={(ok, answers, ko) => save({ ...p, ok: !!(p.ok || ok), last: ok, tries: (p.tries ?? 0) + 1, blanks: answers, translation: ko, ...withReview(p, ok) })}
+              onReveal={(ko) => save({ ...p, revealed: true, last: false, translation: ko || p.translation, ...withReview(p, false) })}
               nav={(g, retryFn) => navButtons(!!g?.ok, retryFn)}
             />
           ) : (

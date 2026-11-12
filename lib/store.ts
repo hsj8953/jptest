@@ -10,9 +10,9 @@
 //   users/{uid}/meta/profile       내 닉네임 (친구들 기록에는 이 이름이 보여요)
 
 import { useSyncExternalStore } from 'react'
-import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { FieldPath, arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { getDb } from './firebase'
-import type { Difficulty, Song, SongProgress, User, VocabProgress } from './types'
+import type { Difficulty, LineProgress, Song, SongProgress, User, VocabProgress } from './types'
 
 export type SongRequest = { id: string; youtubeId: string; title: string; artist: string; requesters: { uid: string; name: string }[]; createdAt: number; status: 'pending' | 'added'; songId?: string; songTitle?: string }
 const toSongRequest = (id: string, x: Record<string, unknown>): SongRequest => ({
@@ -126,6 +126,8 @@ export function startSync(user: User) {
         markReady()
       },
       () => {
+        // 기록을 못 읽은 채로 풀면 예전 기록 위에 덮어쓸 수 있어서 꼭 알려요
+        set({ error: '내 기록을 불러오지 못했어요. 새로고침해 주세요.' })
         progIn = true
         markReady()
       },
@@ -134,8 +136,8 @@ export function startSync(user: User) {
   // 업데이트 소식: 최근 30개
   unsubs.push(
     onSnapshot(
-      query(collection(db, 'news'), orderBy('createdAt', 'desc')),
-      (snap) => set({ news: snap.docs.slice(0, 30).map((d) => ({ id: d.id, ...(d.data() as Omit<NewsItem, 'id'>) })) }),
+      query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30)),
+      (snap) => set({ news: snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<NewsItem, 'id'>) })) }),
       () => {}, // 규칙이 아직 없으면 조용히 비워 둬요
     ),
   )
@@ -219,7 +221,11 @@ export async function touchMember(user: User) {
   const ref = doc(getDb(), 'members', user.uid)
   const now = Date.now()
   const cur = await getDoc(ref)
-  await setDoc(ref, { email: user.email, name: user.name.slice(0, 20), firstAt: cur.exists() ? Number(cur.data().firstAt ?? now) : now, lastAt: now })
+  const name = user.name.slice(0, 20)
+  const old = cur.data()
+  // 방금 남긴 기록이면 다시 쓰지 않아요 (새로고침할 때마다 쓰기가 늘지 않게)
+  if (old && old.email === user.email && old.name === name && now - Number(old.lastAt ?? 0) < 30 * 60_000) return
+  await setDoc(ref, { email: user.email, name, firstAt: old ? Number(old.firstAt ?? now) : now, lastAt: now })
 }
 
 type Pair = { ok: number; total: number }
@@ -291,7 +297,30 @@ export const actions = {
     await Promise.all(scores.docs.map((d) => deleteDoc(d.ref)))
     await deleteDoc(doc(db, 'songs', id))
   },
-  /** 진도 저장. graded 는 이 난이도에서 채점하는 문장 번호들 */
+  /**
+   * 문장 하나의 채점 결과 저장. 그 문장만 바꿔 써서, 다른 기기나 탭에서 푼 문장을 덮어쓰지 않아요.
+   * graded 는 이 난이도에서 채점하는 문장 번호들
+   */
+  async saveLine(songId: string, d: Difficulty, line: number, lp: LineProgress, graded: number[]) {
+    if (!me) return
+    const db = getDb()
+    const key = progKey(songId, d)
+    const p: SongProgress = { ...(state.progress[key] ?? {}), [line]: lp }
+    const now = Date.now()
+    // 화면이 바로 바뀌도록 먼저 반영
+    set({ progress: { ...state.progress, [key]: p }, touched: { ...state.touched, [key]: now } })
+    const ref = doc(db, 'users', me.uid, 'progress', key)
+    try {
+      await setDoc(ref, { lines: { [line]: lp }, touchedAt: now, updatedAt: serverTimestamp() }, { mergeFields: [new FieldPath('lines', String(line)), 'touchedAt', 'updatedAt'] })
+    } catch {
+      // 문장만 바꿔 쓰지 못하면 예전 방식(곡 기록 전체 쓰기)으로 저장해요
+      await setDoc(ref, { lines: p, touchedAt: now, updatedAt: serverTimestamp() })
+    }
+    const ok = graded.filter((i) => p[i]?.ok).length
+    const score = d === 'hard' ? { ok, total: graded.length } : { [d]: { ok, total: graded.length } }
+    await setDoc(doc(db, 'songs', songId, 'scores', me.uid), { name: me.name, ...score, updatedAt: serverTimestamp() }, { merge: true })
+  },
+  /** 곡 기록 전체를 바꿔 써요 (처음부터 다시 풀기). graded 는 이 난이도에서 채점하는 문장 번호들 */
   async saveProgress(songId: string, p: SongProgress, d: Difficulty = 'hard', graded?: number[]) {
     if (!me) return
     const db = getDb()

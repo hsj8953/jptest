@@ -14,7 +14,7 @@ import { WordEditor } from './word-editor'
 import { ExplainEditor } from './explain-editor'
 // [VOICEVOX 꺼 둠] 저장할 때 단어 음성 만들기
 // import { generateAudio, loadVoiceConfig, vvAvailable } from '@/lib/voice'
-import { BackButton, Furigana } from './furigana'
+import { BackButton } from './furigana'
 
 // 붙여넣은 가사의 부수·호환 한자는 일반 한자로 정리해요
 const splitLines = (t: string) => normalizeKanji(t).split(/\r?\n/).map((s) => s.trim()).filter(Boolean)

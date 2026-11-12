@@ -14,9 +14,7 @@ export type BlankLine = {
   answers: { text: string; reading: string }[]
 }
 
-// 帰り道·落ち葉·話し声처럼 한자 사이에 끼는 한 글자 가나만 이어 붙여요 (조사 に·が·の 등은 제외)
-const KANA_GLUE = /^[りちきしみえけれせ]$/
-// 읽기가 없는 한자 덩어리는 飛び方·過ぎ去る처럼 동사 연용형 한 글자도 이어 붙여요
+// 帰り道·落ち葉·話し声·飛び方·過ぎ去る처럼 한자 사이에 끼는 한 글자 가나만 이어 붙여요 (조사 に·が·の 등은 제외)
 const KANA_GLUE_LOOSE = /^[りちきしみえけれせびぎ]$/
 
 function hash(s: string) {
@@ -112,8 +110,18 @@ function okuriganaEnds(text: string, explainWords?: string[]) {
 
 type Cand = { start: number; end: number; text: string; reading: string; score: number }
 
+// 빈칸 후보는 곡 목록·보기 만들기·읽기 찾기에서 여러 번 쓰여서, 같은 곡 객체에서는 문장마다 한 번만 계산해요
+const candCache = new WeakMap<Song, Map<number, { text: string; cands: Cand[] }>>()
 /** 한 문장의 빈칸 후보 전부 (한자 단어 + 가나 단어 + 영어 단어) */
 function candidates(song: Song, lineIndex: number, ruby: string) {
+  if (song.lines[lineIndex]?.ruby !== ruby) return computeCandidates(song, lineIndex, ruby)
+  let m = candCache.get(song)
+  if (!m) candCache.set(song, (m = new Map()))
+  let c = m.get(lineIndex)
+  if (!c) m.set(lineIndex, (c = computeCandidates(song, lineIndex, ruby)))
+  return c
+}
+function computeCandidates(song: Song, lineIndex: number, ruby: string) {
   const { segs, units: ku } = units(ruby)
   const offs: number[] = []
   let text = ''
@@ -124,7 +132,7 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
   const covered = new Array(text.length).fill(false)
   // 大好き처럼 한자 뒤에 붙은 오쿠리가나까지 한 단어면 빈칸에 같이 넣어요 (だいす|き 로 잘리지 않게)
   const wordEnds = okuriganaEnds(text, song.lines[lineIndex]?.explain?.words.map((w) => w.w))
-  const extend = (start: number, end: number) => {
+  const extend = (end: number) => {
     // 문장 풀이나 브라우저의 단어 나누기로 한 단어라고 확인된 경우에만 오쿠리가나를 붙여요
     // (글자 모양만 보고 붙이면 夢ならばど 처럼 조사까지 빈칸에 들어가서 뺐어요)
     const to = wordEnds.get(end)
@@ -135,7 +143,7 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
   ku.forEach((u, k) => {
     const start = offs[u.from]
     const end0 = offs[u.to] + segs[u.to].text.length
-    const end = extend(start, end0)
+    const end = extend(end0)
     for (let c = start; c < end; c++) covered[c] = true
     const okuri = text.slice(end0, end)
     cands.push({ start, end, text: u.text + okuri, reading: u.reading + okuri, score: 300 + (words.some((w) => w.includes(u.text) || u.text.includes(w)) ? 100 : 0) + u.text.length * 10 + h(u.text, k) })
@@ -146,7 +154,7 @@ function candidates(song: Song, lineIndex: number, ruby: string) {
     let to = i
     while (to + 2 < segs.length && !segs[to + 1].kanji && KANA_GLUE_LOOSE.test(segs[to + 1].text) && segs[to + 2].kanji && !covered[offs[to + 2]]) to += 2
     const start = offs[i]
-    const end = extend(start, offs[to] + segs[to].text.length)
+    const end = extend(offs[to] + segs[to].text.length)
     for (let c = start; c < end; c++) covered[c] = true
     const t = text.slice(start, end)
     cands.push({ start, end, text: t, reading: '', score: 150 + Array.from(t).length * 10 + h(t, i) })

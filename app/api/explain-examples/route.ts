@@ -28,11 +28,23 @@ const SCHEMA = {
 }
 
 const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max)
+const HANGUL = /[\u3131-\u318E\uAC00-\uD7A3]/
+const KANJI = /[\u3400-\u9FFF々]/
 const ex = (x: unknown) => {
   const o = (x ?? {}) as Record<string, unknown>
   const ja = str(o.ja, 120)
   const ko = str(o.ko, 120)
-  return ja && ko ? { ja, ko } : null
+  // 일본어 예문에 한글이 섞여 나오면(走るの손好き 같은 깨진 문장) 버려요
+  return ja && ko && !HANGUL.test(ja) ? { ja, ko } : null
+}
+/** 예문이 정말 그 단어를 쓰는지 (会える 자리에 読める 예문이 오는 걸 걸러요). 활용형도 통과하게 느슨하게 봐요 */
+function usesWord(ja: string, w: string) {
+  const base = ja.replace(/\{[^{}]*\}/g, '')
+  const kanji = Array.from(w).find((c) => KANJI.test(c))
+  if (kanji) return base.includes(kanji)
+  const chars = Array.from(w)
+  if (chars.length <= 2) return true // 짧은 가나 단어는 활용하면 모양이 다 바뀌어서 확인하지 않아요
+  return base.includes(chars.slice(0, -1).join(''))
 }
 
 type In = { line: string; words: { w: string; m: string }[]; grammar: string[] }
@@ -64,7 +76,14 @@ export async function POST(req: Request) {
       const g = Array.isArray(o.grammar) ? o.grammar : []
       // 개수가 안 맞으면 순서가 어긋났을 수 있어서 그 문장은 버려요
       if (w.length !== it.words.length || g.length !== it.grammar.length) return null
-      return { words: w.map(ex), grammar: g.map(ex) }
+      // 못 쓰는 예문은 null로 돌려줘요 (그 단어는 비워 두고, 다음에 '예문 채우기'를 누르면 다시 만들어요)
+      return {
+        words: w.map((x, k) => {
+          const e = ex(x)
+          return e && usesWord(e.ja, it.words[k].w) ? e : null
+        }),
+        grammar: g.map(ex),
+      }
     }),
   })
 }

@@ -4,6 +4,9 @@
 import { getFirebaseAuth } from './firebase'
 import { postAi, type AiError } from './ai-client'
 import { answerOf } from './ruby'
+import { addFurigana } from './furigana'
+import { chooseRuby } from './example-ruby'
+import { loadKanjiDict } from './speech'
 import type { Line, LineExplain } from './types'
 
 const CHUNK = 8
@@ -43,6 +46,21 @@ export async function generateExplain(lines: Line[], onProgress?: (done: number,
   }
   return { explains: out, error, detail, failed, total: need.length }
 }
+
+/**
+ * 예문의 후리가나 바로잡기: AI가 붙인 것과 사전(kuromoji)이 붙인 것 중 더 믿을 만한 쪽을 써요 (lib/example-ruby.ts).
+ * AI는 明{あ}日·話{は}せる·手{て}本{ほん}처럼 읽기를 잘못 나누는 일이 잦아서예요.
+ * 사전을 못 불러오면 AI가 준 그대로 둬요.
+ */
+async function dictFurigana(ja: string) {
+  try {
+    const [d, kd] = await Promise.all([addFurigana(ja), loadKanjiDict().catch(() => null)])
+    return chooseRuby(ja, d, kd)
+  } catch {
+    return ja
+  }
+}
+const fixEx = async <T extends { ja: string; ko: string }>(e: T | null | undefined) => (e ? { ...e, ja: await dictFurigana(e.ja) } : null)
 
 /** 예문을 붙일 단어: 조사·조동사·접미사·기호 같은 건 빼요 (뻔하고 시간만 걸려서) */
 // 품사 이름이 '격조사', '조사(주격)'처럼 조금 달라도 걸러지게 글자가 들어 있는지로 봐요
@@ -90,20 +108,21 @@ export async function generateExamples(lines: Line[], onProgress?: (done: number
         token,
         (sec) => onProgress?.(done, need.length, `Gemini가 바빠서 ${sec}초 뒤 다시 시도해요…`),
       )
-      json.items.forEach((r, j) => {
+      for (const [j, raw] of json.items.entries()) {
         const i = part[j]
         const ex = out[i]!
-        if (!r) {
+        if (!raw) {
           failed++
-          return
+          continue
         }
+        const r = { words: await Promise.all(raw.words.map(fixEx)), grammar: await Promise.all(raw.grammar.map(fixEx)) }
         const byIdx = new Map(pick[j].map((k, n) => [k, r.words[n]]))
         out[i] = {
           ...ex,
           words: ex.words.map((w, k) => (w.ex || !byIdx.get(k) ? w : { ...w, ex: byIdx.get(k)! })),
           grammar: ex.grammar.map((g, k) => (g.ex || !r.grammar[k] ? g : { ...g, ex: r.grammar[k]! })),
         }
-      })
+      }
     } catch (e) {
       failed += part.length
       error ??= (e as AiError).code ?? (e as Error).message
