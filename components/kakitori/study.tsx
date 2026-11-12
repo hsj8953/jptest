@@ -63,6 +63,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   const drafts = useRef<Record<number, { answer: string; translation: string }>>({})
   const answerRef = useRef<HTMLTextAreaElement>(null)
   const koRef = useRef<HTMLInputElement>(null)
+  const listenRowRef = useRef<HTMLDivElement>(null)
   const [needKo, setNeedKo] = useState(false)
   // 유튜브 화면의 ▶를 눌러도 지금 문장 구간만 재생되게 해요
   const segRef = useRef<{ start: number | null; end: () => number; loop: boolean }>({ start: null, end: () => 0, loop: false })
@@ -178,6 +179,18 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     actions.saveLine(song.id, difficulty, current, lp, graded).catch(() => setSaveError('기록을 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
   }
 
+  // 다시 풀기·다음 문장을 누르면 채점 결과가 접히면서 화면이 엉뚱한 곳(아래쪽 목록)을 비추게 돼요.
+  // 특히 휴대폰에서는 눌러도 반응이 없는 것처럼 보이고, 한 번 더 누르면 다른 버튼이 눌려요.
+  // 그래서 문장 듣기 버튼이 화면 위쪽에 오도록 맞춰 줘요 (이미 잘 보이는 자리면 그대로 둬요).
+  const toQuestion = () =>
+    requestAnimationFrame(() => {
+      const el = listenRowRef.current
+      if (!el) return
+      const top = el.getBoundingClientRect().top
+      const HEADER = 72
+      if (top < HEADER || top > window.innerHeight - 320) window.scrollTo({ top: Math.max(0, window.scrollY + top - HEADER) })
+    })
+
   const move = (k: number) => {
     if (k < 0 || k >= total) return
     drafts.current[current] = { answer, translation }
@@ -190,6 +203,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
     setResult(d ? null : savedResult(q))
     setNeedKo(false)
     setCurrent(k)
+    toQuestion()
   }
 
   const submit = () => {
@@ -213,7 +227,8 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   }
   const retry = () => {
     setResult(null)
-    setTimeout(() => answerRef.current?.focus(), 0)
+    setTimeout(() => answerRef.current?.focus({ preventScroll: true }), 0)
+    toQuestion()
   }
 
   const isLast = current === total - 1
@@ -228,7 +243,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   )
   const navButtons = (ok: boolean, retryFn: () => void) => (
     <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-      {!ok && <Button variant="outline" className="h-12 w-full text-base sm:h-10 sm:w-auto sm:text-sm" onClick={retryFn}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
+      {!ok && <Button variant="outline" className="h-12 w-full text-base sm:h-10 sm:w-auto sm:text-sm" onClick={() => { retryFn(); toQuestion() }}><RotateCcw data-icon="inline-start" />다시 풀기</Button>}
       {nextButton}
     </div>
   )
@@ -249,7 +264,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
             )}
           </div>
 
-          <div className="relative mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div ref={listenRowRef} className="relative mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               onClick={() => {
                 dismissHint()

@@ -68,7 +68,7 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
   const line = song.lines[lineIndex]
 
   useEffect(() => {
-    if (mode === 'normal') inputs.current[0]?.focus()
+    if (mode === 'normal') inputs.current[0]?.focus({ preventScroll: true })
   }, [mode])
 
   const filled = answers.every((a) => a.trim())
@@ -108,7 +108,7 @@ export function BlankCard({ song, lineIndex, mode, prev, onGrade, onReveal, nav 
     setGraded(null)
     setAnswers(Array(n).fill(''))
     setActive(0)
-    setTimeout(() => inputs.current[0]?.focus(), 0)
+    setTimeout(() => inputs.current[0]?.focus({ preventScroll: true }), 0)
   }
 
   const onKey = (e: React.KeyboardEvent) => {
