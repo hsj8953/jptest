@@ -36,7 +36,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
   /** 복습: 처음 문장은 예전 답을 지우고 새로 풀어요 */
   fresh?: boolean
 }) {
-  const { progress } = useStore()
+  const { progress, blocked } = useStore()
   const prog = progress[progKey(song.id, difficulty)] ?? {}
   const L = song.lines
   const total = L.length
@@ -479,7 +479,7 @@ export function Study({ song, user, onBack, initialLine, difficulty = 'hard', on
             {(() => {
               // 내 기록은 항상 최신 값으로, 친구들은 정답 많은 순
               const others = scores
-                .filter((sc) => sc.uid !== user.uid)
+                .filter((sc) => sc.uid !== user.uid && !blocked.includes(sc.uid)) // 차단한 사람은 숨겨요
                 .map((sc) => ({ uid: sc.uid, name: sc.name, ...(scoreFor(sc, difficulty) ?? { ok: -1, total: 0 }) }))
                 .filter((sc) => sc.ok >= 0)
               const list = [{ uid: user.uid, name: user.name, ok: okCount, total: graded.length }, ...others].sort((a, b) => b.ok - a.ok)

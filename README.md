@@ -26,9 +26,9 @@ npm run dev     # http://localhost:3000
 
 ## 누가 무엇을 할 수 있나
 
-- **관리자** (`NEXT_PUBLIC_ADMIN_EMAIL`): 곡 등록 · 편집 · 타이밍 · 삭제, 친구 초대
-- **초대된 친구** (친구 초대 화면에 추가한 이메일): 곡 목록, 받아쓰기, 결과 보기
-- **그 외**: "아직 초대되지 않은 계정이에요" 화면만 보여요
+- **관리자** (`NEXT_PUBLIC_ADMIN_EMAIL`): 곡 등록 · 편집 · 타이밍 · 삭제, 사용자 관리(차단)
+- **로그인한 사람**: 구글 계정으로 로그인하면 누구나 곡 목록, 받아쓰기, 결과 보기
+- **차단된 사람** (사용자 관리에서 차단): "이용이 제한된 계정이에요" 화면만 보여요
 - 화면의 버튼 구분과 별개로, 실제 권한은 `firestore.rules` 가 서버에서 막아요.
 
 ## 배포 (Vercel)
@@ -46,7 +46,7 @@ components/kakitori/
   study.tsx                   받아쓰기 · 채점 · 틀린 글자 비교
   editor.tsx                  곡 등록/편집 · 한자 읽기 자동 생성
   timing.tsx                  타이밍 찍기 (스페이스바 지원)
-  invite.tsx                  친구 초대
+  users.tsx                   사용자 관리 (목록 · 차단)
   header.tsx / login.tsx      헤더, 로그인
 lib/
   firebase.ts                 Firebase 연결

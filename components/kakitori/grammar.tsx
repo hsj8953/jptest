@@ -1,30 +1,56 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Music2, Search, SpellCheck } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import { grammarIndex, grammarSpan, type GrammarEntry } from '@/lib/grammar'
-import { reviewPlan } from '@/lib/review'
+import { wrongItems } from '@/lib/wrong'
 import { parseRuby } from '@/lib/ruby'
 import { BackButton, Furigana } from './furigana'
 
 type Sort = 'count' | 'name' | 'mine'
 
 const norm = (t: string) => t.toLowerCase().replace(/[\s　~～〜]+/g, '').replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+/** 브라우저 기록에 적어 둔, 펼쳐 보던 문법 */
+function stateKey(): string | null {
+  try {
+    const g = (window.history.state as { g?: unknown } | null)?.g
+    return typeof g === 'string' ? g : null
+  } catch {
+    return null
+  }
+}
 const thumb = (id: string | null) => (id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : null)
 
 /** 문법 모음: 곡 해설에 나온 문법을 문법별로 모아서, 그 문법이 들어간 가사를 곡에 상관없이 보여 줘요 */
 export function GrammarBook({ isAdmin, onBack, onGoLine }: { isAdmin: boolean; onBack: () => void; onGoLine: (songId: string, line: number) => void }) {
   const { songs, progress, ready } = useStore()
   const all = useMemo(() => grammarIndex(songs, isAdmin), [songs, isAdmin])
-  // 내가 틀렸고 아직 외우지 못한 문장 (난이도 상관없이)
-  const missed = useMemo(() => {
-    const p = reviewPlan(songs, progress, isAdmin)
-    return new Set([...p.due, ...p.upcoming].map((it) => `${it.song.id}:${it.line}`))
-  }, [songs, progress, isAdmin])
+  // 지금 오답 노트에 있는 문장 (난이도 상관없이). 다시 풀어서 맞히면 빠져요
+  const missed = useMemo(() => new Set(wrongItems(songs, progress, isAdmin).map((it) => `${it.song.id}:${it.line}`)), [songs, progress, isAdmin])
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<Sort>('count')
-  const [openKey, setOpenKey] = useState<string | null>(null)
+  // 펼친 문법은 브라우저 기록에 남겨요: 뒤로 가기를 누르면 목록으로, '이 문장 풀기'에서 돌아오면 보던 문법으로
+  const [openKey, setOpenKey] = useState<string | null>(() => stateKey())
+  useEffect(() => {
+    const onPop = () => setOpenKey(stateKey())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  const openDetail = (key: string) => {
+    try {
+      window.history.pushState({ g: key }, '', window.location.href)
+    } catch {
+      /* 무시 */
+    }
+    setOpenKey(key)
+    window.scrollTo(0, 0)
+  }
+  const closeDetail = () => {
+    if (stateKey()) return window.history.back() // popstate에서 목록으로 돌아가요
+    setOpenKey(null)
+    window.scrollTo(0, 0)
+  }
   const open = all.find((g) => g.key === openKey)
 
   const missCount = (g: GrammarEntry) => g.hits.filter((h) => missed.has(`${h.song.id}:${h.line}`)).length
@@ -34,7 +60,7 @@ export function GrammarBook({ isAdmin, onBack, onGoLine }: { isAdmin: boolean; o
   else if (sort === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'ja'))
   else list = [...list].sort((a, b) => b.hits.length - a.hits.length || a.name.localeCompare(b.name, 'ja'))
 
-  if (open) return <GrammarDetail g={open} missed={missed} onBack={() => { setOpenKey(null); window.scrollTo(0, 0) }} onGoLine={onGoLine} />
+  if (open) return <GrammarDetail g={open} missed={missed} onBack={closeDetail} onGoLine={onGoLine} />
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
@@ -59,7 +85,7 @@ export function GrammarBook({ isAdmin, onBack, onGoLine }: { isAdmin: boolean; o
       ) : list.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-border px-4 py-12 text-center">
           <SpellCheck className="mx-auto size-8 text-muted-foreground" />
-          <p className="mt-3 font-semibold">{all.length === 0 ? '아직 모인 문법이 없어요' : sort === 'mine' && !nq ? '복습 중인 문장에 나온 문법이 없어요' : '찾는 문법이 없어요'}</p>
+          <p className="mt-3 font-semibold">{all.length === 0 ? '아직 모인 문법이 없어요' : sort === 'mine' && !nq ? '틀린 문장에 나온 문법이 없어요' : '찾는 문법이 없어요'}</p>
           <p className="mt-1 text-sm text-muted-foreground">{all.length === 0 ? '곡에 문장 풀이가 생기면 여기에 모여요.' : sort === 'mine' && !nq ? '잘하고 있어요!' : '다른 말로 찾아보세요.'}</p>
         </div>
       ) : (
@@ -69,13 +95,13 @@ export function GrammarBook({ isAdmin, onBack, onGoLine }: { isAdmin: boolean; o
             const miss = missCount(g)
             return (
               <li key={g.key} className="border-t border-border first:border-t-0">
-                <button onClick={() => { setOpenKey(g.key); window.scrollTo(0, 0) }} className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-muted/50">
+                <button onClick={() => openDetail(g.key)} className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-muted/50">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-jp text-base font-bold">{g.name}</span>
                     <span className="mt-0.5 block truncate text-xs text-muted-foreground">{g.means.slice(0, 2).join(', ') || '뜻 없음'}</span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-xs text-muted-foreground"><b className="text-sm text-foreground tabular-nums">{g.hits.length}</b>문장 · {songsIn.length}곡{miss > 0 && <span className="ml-1 rounded-full bg-destructive/10 px-1.5 text-[11px] font-bold text-destructive">복습 중 {miss}</span>}</span>
+                    <span className="text-xs text-muted-foreground"><b className="text-sm text-foreground tabular-nums">{g.hits.length}</b>문장 · {songsIn.length}곡{miss > 0 && <span className="ml-1 rounded-full bg-destructive/10 px-1.5 text-[11px] font-bold text-destructive">틀림 {miss}</span>}</span>
                     <span className="flex gap-0.5">
                       {songsIn.slice(0, 4).map((s) => (thumb(s.youtubeId) ? <img key={s.id} src={thumb(s.youtubeId)!} alt="" className="h-3.5 w-5 rounded-[3px] object-cover" /> : <span key={s.id} className="h-3.5 w-5 rounded-[3px] bg-muted" />))}
                     </span>
@@ -119,7 +145,7 @@ function GrammarDetail({ g, missed, onBack, onGoLine }: { g: GrammarEntry; misse
                 {t ? <img src={t} alt="" className="h-6 w-9 rounded object-cover" /> : <Music2 className="size-4" />}
                 <b className="truncate font-jp text-[13px] text-foreground">{h.song.title}</b>
                 <span className="truncate">· {h.song.artist} · {h.line + 1}번 문장</span>
-                {missed.has(`${h.song.id}:${h.line}`) && <span className="ml-auto shrink-0 rounded-full bg-destructive/10 px-1.5 text-[11px] font-bold text-destructive">복습 중인 문장</span>}
+                {missed.has(`${h.song.id}:${h.line}`) && <span className="ml-auto shrink-0 rounded-full bg-destructive/10 px-1.5 text-[11px] font-bold text-destructive">틀린 문장</span>}
               </p>
               <p className="mt-2 font-jp text-lg leading-loose"><Marked ruby={l?.ruby ?? ''} span={grammarSpan(g.name, l?.ruby ?? '')} /></p>
               {l?.ko && <p className="text-sm text-muted-foreground">{l.ko}</p>}

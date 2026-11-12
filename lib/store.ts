@@ -248,7 +248,7 @@ export function watchScores(songId: string, cb: (scores: Score[]) => void) {
           const x = d.data()
           const pair = (v: unknown): Pair | undefined => (v && typeof v === 'object' ? { ok: Number((v as Pair).ok ?? 0), total: Number((v as Pair).total ?? 0) } : undefined)
           return { uid: d.id, name: String(x.name ?? '친구'), ok: Number(x.ok ?? 0), total: Number(x.total ?? 0), easy: pair(x.easy), normal: pair(x.normal) }
-        }).filter((sc) => !state.blocked.includes(sc.uid)), // 차단한 사람은 순위표에서 숨겨요
+        }),
       ),
     () => cb([]),
   )

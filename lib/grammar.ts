@@ -19,9 +19,10 @@ export type GrammarEntry = {
 const clean = (t: string) => t.replace(/[~〜∼]/g, '～').replace(/[\s　]+/g, ' ').trim()
 
 export function splitTitle(title: string) {
-  const t = clean(title)
+  const t = String(title ?? '').replace(/[\s\u3000]+/g, ' ').trim()
   const m = t.match(/^(.+?)\s*[（(](.+)[)）]\s*$/)
-  return m ? { name: m[1].trim(), mean: m[2].trim() } : { name: t, mean: '' }
+  // 문법 이름의 물결표는 ～로 통일하고, 한국어 뜻은 ~로 통일해요
+  return m ? { name: clean(m[1]), mean: m[2].trim().replace(/[～〜∼]/g, '~') } : { name: clean(t), mean: '' }
 }
 export const grammarKey = (name: string) => clean(name).replace(/\s/g, '')
 

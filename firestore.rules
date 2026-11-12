@@ -39,10 +39,14 @@ service cloud.firestore {
       // 아직 아무도 신청 안 한 곡인지 확인할 수 있게, 없는 문서는 누구나 확인 가능
       allow get: if isAdmin() || (member() && (resource == null || request.auth.uid in resource.data.requesterUids));
       allow list: if isAdmin() || (member() && request.auth.uid in resource.data.requesterUids);
+      // 누구나 가입할 수 있으니 제목·가수 길이를 서버에서도 막아요
       allow create: if member()
         && request.resource.data.requesterUids == [request.auth.uid]
         && request.resource.data.status == 'pending'
-        && request.resource.data.keys().hasOnly(['youtubeId', 'title', 'artist', 'requesterUids', 'requesters', 'status', 'createdAt']);
+        && request.resource.data.keys().hasOnly(['youtubeId', 'title', 'artist', 'requesterUids', 'requesters', 'status', 'createdAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() <= 100
+        && request.resource.data.artist is string && request.resource.data.artist.size() <= 80
+        && request.resource.data.requesters.size() == 1;
       allow update: if isAdmin() || (member()
         && resource.data.status == 'pending'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['requesterUids', 'requesters'])
@@ -75,9 +79,11 @@ service cloud.firestore {
       allow write: if isAdmin();
 
       // 친구들 점수: 멤버는 모두 보고, 자기 것만 씀 (관리자는 곡 삭제 때 정리)
+      // 순위표에 보이는 이름은 20자까지만 (긴 글이나 도배를 막아요)
       match /scores/{uid} {
         allow read: if member();
-        allow write: if member() && request.auth.uid == uid;
+        allow create, update: if member() && request.auth.uid == uid
+          && request.resource.data.name is string && request.resource.data.name.size() <= 20;
         allow delete: if isAdmin();
       }
     }

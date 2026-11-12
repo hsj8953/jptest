@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { Header } from '@/components/kakitori/header'
 import { Library } from '@/components/kakitori/library'
@@ -187,13 +187,21 @@ export default function Page() {
     if (auth === 'in' && user?.name && !nickOpen && view === 'library' && shouldShowTutorial()) setTutOpen(true)
   }, [auth, user?.name, nickOpen, view])
 
+  // 쓰는 도중에 차단됐다가 풀리면, 끊긴 실시간 연결을 되살리려고 새로고침해요
+  const blockedNow = !!user && !user.isAdmin && blocked.includes(user.uid)
+  const wasBlocked = useRef(false)
+  useEffect(() => {
+    if (wasBlocked.current && !blockedNow && ready) window.location.reload()
+    wasBlocked.current = blockedNow
+  }, [blockedNow, ready])
+
   if (!firebaseConfigured) return <SetupNeeded />
 
   if (auth === 'loading') {
     return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground">불러오는 중…</main>
   }
   if (auth === 'out') return <Login onLogin={login} busy={loginBusy} error={loginError} />
-  if (auth === 'blocked' || (user && !user.isAdmin && blocked.includes(user.uid))) return <Blocked email={email} onLogout={logout} />
+  if (auth === 'blocked' || blockedNow) return <Blocked email={email} onLogout={logout} />
   if (!user) return null
   if (nickOpen) {
     const first = !user.name
