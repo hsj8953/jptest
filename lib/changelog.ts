@@ -10,6 +10,7 @@ export const CHANGELOG: NewsItem[] = [
     title: '11월 14일 업데이트',
     createdAt: at('2026-11-14T10:50:00+09:00'),
     items: [
+      { kind: 'new', title: '새 노래 2곡', body: 'Official髭男dism「Chessboard」, 優里「レオ」가 추가됐어요. 공부하고 싶은 노래가 있으면 곡 목록의 곡 신청으로 알려 주세요.' },
       { kind: 'improve', title: '승인 없이 바로 이용', body: '이제 구글 계정으로 로그인하면 승인을 기다리지 않고 바로 쓸 수 있어요. 공부하고 싶은 친구가 있으면 사이트 주소만 알려 주세요.' },
       { kind: 'improve', title: '예문 글씨가 더 크게', body: '문장 풀이의 실생활 예문 글씨를 키웠어요. 예문 위 후리가나도 같이 커져서 읽기 편해요.' },
       { kind: 'improve', title: '다시 풀기 뒤 화면 위치', body: '다시 풀기나 다음 문장을 누르면 화면이 문제 쪽으로 돌아와요. 전에는 아래쪽 문장 목록이 보여서 눌러도 반응이 없는 것처럼 보였어요.' },
